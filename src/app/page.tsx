@@ -52,6 +52,9 @@ export default function Home() {
         <a href="/deposito" className="underline">
           Depósito
         </a>
+        <a href="/historial" className="underline">
+          Historial
+        </a>
         <a href="/configuracion" className="underline">
           Configuración
         </a>
