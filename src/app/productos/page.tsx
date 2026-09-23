@@ -8,6 +8,7 @@ import {
   actualizarProducto,
   darDeBajaProducto,
 } from "@/lib/actions/productos";
+import { guardarApertura } from "@/lib/actions/deposito";
 import { getUsuario, getDispositivoId } from "@/lib/session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,12 +31,20 @@ import {
 
 type Producto = Awaited<ReturnType<typeof listarProductos>>[number];
 
+function hoyLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
+
 export default function ProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [nombre, setNombre] = useState("");
   const [variedad, setVariedad] = useState("");
   const [tipoStock, setTipoStock] = useState<"libre" | "controlado">("libre");
   const [precio, setPrecio] = useState("");
+  const [stockInicial, setStockInicial] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
   async function refrescar() {
@@ -53,6 +62,7 @@ export default function ProductosPage() {
     setVariedad("");
     setTipoStock("libre");
     setPrecio("");
+    setStockInicial("");
     setEditandoId(null);
   }
 
@@ -60,6 +70,8 @@ export default function ProductosPage() {
     if (!nombre || !precio) return;
     const usuario = getUsuario() || "admin";
     const dispositivo = getDispositivoId();
+    let productoId = editandoId;
+
     if (editandoId) {
       await actualizarProducto({
         id: editandoId,
@@ -71,7 +83,7 @@ export default function ProductosPage() {
         dispositivo,
       });
     } else {
-      await crearProducto({
+      const creado = await crearProducto({
         nombre,
         variedad,
         tipoStock,
@@ -79,7 +91,18 @@ export default function ProductosPage() {
         usuario,
         dispositivo,
       });
+      productoId = creado.id;
     }
+
+    if (tipoStock === "controlado" && stockInicial.trim() !== "" && productoId) {
+      await guardarApertura({
+        fecha: hoyLocal(),
+        items: [{ productoId, cantidadInicial: stockInicial }],
+        usuario,
+        dispositivo,
+      });
+    }
+
     limpiar();
     refrescar();
   }
@@ -90,6 +113,7 @@ export default function ProductosPage() {
     setVariedad(p.variedad ?? "");
     setTipoStock(p.tipoStock);
     setPrecio(p.precioUnitario);
+    setStockInicial("");
   }
 
   async function baja(id: string) {
@@ -134,6 +158,22 @@ export default function ProductosPage() {
             onChange={(e) => setPrecio(e.target.value)}
           />
         </div>
+        {tipoStock === "controlado" && (
+          <div>
+            <label className="text-xs text-neutral-500 mb-1 block">
+              Stock inicial en depósito hoy ({hoyLocal()}) — opcional, se puede cargar
+              después desde Depósito
+            </label>
+            <Input
+              type="number"
+              min="0"
+              placeholder="Cantidad de bultos"
+              value={stockInicial}
+              onChange={(e) => setStockInicial(e.target.value)}
+              className="w-56"
+            />
+          </div>
+        )}
         <div className="flex gap-2">
           <Button onClick={guardar}>{editandoId ? "Guardar cambios" : "Agregar producto"}</Button>
           {editandoId && (
