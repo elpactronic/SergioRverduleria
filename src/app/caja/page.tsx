@@ -313,7 +313,7 @@ export default function CajaPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="text-red-600 hover:text-red-700"
+                          className="text-neutral-400 hover:text-neutral-700"
                           onClick={() => abrirCancelarPedido(p)}
                         >
                           Cancelar
