@@ -13,6 +13,7 @@ import { BotonVolver } from "@/components/boton-volver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ interface ItemForm {
   cantidadBultos: string;
   precioUnitario: string;
   total: string;
+  origen: "mostrador" | "deposito";
 }
 
 function hoyLocal() {
@@ -54,6 +56,7 @@ export default function VendedorPage() {
   const [productoSeleccionado, setProductoSeleccionado] = useState<ProductoCache | null>(
     null,
   );
+  const [origenDeposito, setOrigenDeposito] = useState(false);
   const [pedidoConfirmado, setPedidoConfirmado] = useState<{
     numeroPedido: number;
     fecha: string;
@@ -89,11 +92,16 @@ export default function VendedorPage() {
         cantidadBultos: cantidad,
         precioUnitario: precio,
         total,
+        origen:
+          productoSeleccionado.tipoStock === "controlado" && origenDeposito
+            ? "deposito"
+            : "mostrador",
       },
     ]);
     setProductoSeleccionado(null);
     setCantidad("1");
     setPrecio("");
+    setOrigenDeposito(false);
   }
 
   function quitarItem(idx: number) {
@@ -193,38 +201,47 @@ export default function VendedorPage() {
           onSeleccionar={(p) => {
             setProductoSeleccionado(p);
             setPrecio(p.precioUnitario);
+            setOrigenDeposito(false);
           }}
         />
         {productoSeleccionado && (
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <span className="text-xs text-neutral-500">
-                {productoSeleccionado.nombre}
-                {productoSeleccionado.variedad ? ` — ${productoSeleccionado.variedad}` : ""}
-              </span>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <span className="text-xs text-neutral-500">
+                  {productoSeleccionado.nombre}
+                  {productoSeleccionado.variedad ? ` — ${productoSeleccionado.variedad}` : ""}
+                </span>
+              </div>
+              <div>
+                <label className="text-xs">Cant. (bultos)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={cantidad}
+                  onChange={(e) => setCantidad(e.target.value)}
+                  className="w-24"
+                />
+              </div>
+              <div>
+                <label className="text-xs">Precio unit.</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={precio}
+                  onChange={(e) => setPrecio(e.target.value)}
+                  className="w-28"
+                />
+              </div>
+              <Button onClick={agregarItem}>Agregar</Button>
             </div>
-            <div>
-              <label className="text-xs">Cant. (bultos)</label>
-              <Input
-                type="number"
-                min="0"
-                step="0.5"
-                value={cantidad}
-                onChange={(e) => setCantidad(e.target.value)}
-                className="w-24"
-              />
-            </div>
-            <div>
-              <label className="text-xs">Precio unit.</label>
-              <Input
-                type="number"
-                min="0"
-                value={precio}
-                onChange={(e) => setPrecio(e.target.value)}
-                className="w-28"
-              />
-            </div>
-            <Button onClick={agregarItem}>Agregar</Button>
+            {productoSeleccionado.tipoStock === "controlado" && (
+              <label className="flex items-center gap-2 text-xs text-neutral-600">
+                <Switch checked={origenDeposito} onCheckedChange={setOrigenDeposito} />
+                Esta vez sale de depósito (descuenta stock)
+              </label>
+            )}
           </div>
         )}
       </div>
@@ -247,8 +264,7 @@ export default function VendedorPage() {
                 <TableCell>
                   <div className="flex items-center gap-2">
                     {item.detalle}
-                    {productos.find((p) => p.id === item.productoId)?.tipoStock ===
-                      "controlado" && (
+                    {item.origen === "deposito" && (
                       <Badge variant="secondary" className="text-[10px]">
                         Depósito · se descuenta
                       </Badge>

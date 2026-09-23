@@ -18,6 +18,10 @@ export const estadoPedidoEnum = pgEnum("estado_pedido", [
   "cobrado",
   "cancelado",
 ]);
+export const origenItemEnum = pgEnum("origen_item_pedido", [
+  "mostrador",
+  "deposito",
+]);
 export const tipoMovimientoEnum = pgEnum("tipo_movimiento", [
   "salida_venta",
   "entrada",
@@ -93,6 +97,7 @@ export const pedidoItems = pgTable("pedido_items", {
     scale: 2,
   }).notNull(),
   total: numeric("total", { precision: 12, scale: 2 }).notNull(),
+  origen: origenItemEnum("origen").notNull().default("mostrador"),
 });
 
 export const cobros = pgTable("cobros", {

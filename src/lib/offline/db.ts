@@ -21,12 +21,15 @@ export interface ClienteCache {
   actualizadoEn: string;
 }
 
+export type OrigenItem = "mostrador" | "deposito";
+
 export interface PedidoItemLocal {
   productoId: string;
   detalle: string;
   cantidadBultos: string;
   precioUnitario: string;
   total: string;
+  origen: OrigenItem;
 }
 
 export type SyncStatus = "pendiente" | "sincronizado" | "error";

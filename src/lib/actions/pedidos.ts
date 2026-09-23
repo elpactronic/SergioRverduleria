@@ -5,7 +5,6 @@ import { getDb } from "@/db";
 import {
   pedidos,
   pedidoItems,
-  productos,
   movimientosStock,
   cobros,
 } from "@/db/schema";
@@ -17,6 +16,7 @@ export interface PedidoItemSync {
   cantidadBultos: string;
   precioUnitario: string;
   total: string;
+  origen: "mostrador" | "deposito";
 }
 
 export interface PedidoSync {
@@ -80,6 +80,7 @@ export async function sincronizarPedido(pedido: PedidoSync) {
         cantidadBultos: item.cantidadBultos,
         precioUnitario: item.precioUnitario,
         total: item.total,
+        origen: item.origen,
       })),
     );
   }
@@ -133,17 +134,16 @@ export async function conciliarCobro(cobroId: string, pedidoId: string) {
     .where(eq(pedidos.id, pedidoId))
     .returning();
 
-  const itemsControlados = await db
+  const itemsDelPedido = await db
     .select({
       productoId: pedidoItems.productoId,
       cantidad: pedidoItems.cantidadBultos,
-      tipoStock: productos.tipoStock,
+      origen: pedidoItems.origen,
     })
     .from(pedidoItems)
-    .innerJoin(productos, eq(pedidoItems.productoId, productos.id))
     .where(eq(pedidoItems.pedidoId, pedidoId));
 
-  for (const item of itemsControlados.filter((i) => i.tipoStock === "controlado")) {
+  for (const item of itemsDelPedido.filter((i) => i.origen === "deposito")) {
     await db.insert(movimientosStock).values({
       productoId: item.productoId,
       tipo: "salida_venta",
