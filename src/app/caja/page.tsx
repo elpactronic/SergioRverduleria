@@ -45,6 +45,7 @@ type DetallePedido = Awaited<ReturnType<typeof obtenerDetallePedido>>;
 const estadoPedidoLabel: Record<string, { texto: string; variant: "default" | "secondary" | "destructive" }> = {
   creado: { texto: "Pendiente de cobro", variant: "secondary" },
   cobrado: { texto: "Cobrado", variant: "default" },
+  retirado: { texto: "Retirado", variant: "secondary" },
   cancelado: { texto: "Cancelado", variant: "destructive" },
 };
 

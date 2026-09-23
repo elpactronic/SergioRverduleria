@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, max } from "drizzle-orm";
+import { and, desc, eq, inArray, max } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   pedidos,
@@ -63,7 +63,11 @@ export async function listarPedidosRecientes(limite = 5) {
   return filas;
 }
 
-/** Lista los pedidos ya pagados más recientes, ordenados por cuándo se cobraron (no por cuándo se crearon). */
+/**
+ * Lista los pedidos ya pagados más recientes (cobrados y/o ya retirados),
+ * ordenados por cuándo se cobraron. Sirve como bandeja de "para entregar"
+ * y a la vez como registro de cuándo se retiró cada uno.
+ */
 export async function listarPedidosPagadosRecientes(limite = 5) {
   const db = getDb();
   const filas = await db
@@ -73,16 +77,50 @@ export async function listarPedidosPagadosRecientes(limite = 5) {
       fecha: pedidos.fecha,
       clienteNombre: clientes.nombre,
       total: pedidos.total,
+      estado: pedidos.estado,
       cobradoEn: cobros.registradoEn,
+      retiradoEn: pedidos.retiradoEn,
     })
     .from(pedidos)
     .innerJoin(cobros, eq(cobros.pedidoId, pedidos.id))
     .leftJoin(clientes, eq(pedidos.clienteId, clientes.id))
-    .where(eq(pedidos.estado, "cobrado"))
+    .where(inArray(pedidos.estado, ["cobrado", "retirado"]))
     .orderBy(desc(cobros.registradoEn))
     .limit(limite);
 
   return filas;
+}
+
+/** Marca un pedido como retirado por el cliente, con timestamp exacto para cruzar con cámaras. */
+export async function marcarRetirado(params: {
+  pedidoId: string;
+  usuario: string;
+  dispositivo?: string;
+}) {
+  const db = getDb();
+  const anterior = await db.query.pedidos.findFirst({
+    where: eq(pedidos.id, params.pedidoId),
+  });
+
+  const [actualizado] = await db
+    .update(pedidos)
+    .set({ estado: "retirado", retiradoEn: new Date() })
+    .where(eq(pedidos.id, params.pedidoId))
+    .returning();
+
+  await registrarAuditoria({
+    operationId: crypto.randomUUID(),
+    usuario: params.usuario,
+    dispositivo: params.dispositivo,
+    accion: "RETIRAR_PEDIDO",
+    entidad: "pedido",
+    entidadId: params.pedidoId,
+    numeroPedido: actualizado.numeroPedido,
+    estadoAnterior: anterior,
+    estadoNuevo: actualizado,
+  });
+
+  return actualizado;
 }
 
 /** Trae un pedido con sus ítems y el nombre del cliente, para la pantalla de confirmación de cobro. */

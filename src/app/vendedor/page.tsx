@@ -6,7 +6,7 @@ import { db, type ClienteCache, type ProductoCache } from "@/lib/offline/db";
 import { siguienteNumeroPedido } from "@/lib/offline/numero-pedido";
 import { sincronizarTodo, actualizarCatalogosLocales } from "@/lib/offline/sync";
 import { getDispositivoId, getUsuario } from "@/lib/session";
-import { listarPedidosPagadosRecientes } from "@/lib/actions/pedidos";
+import { listarPedidosPagadosRecientes, marcarRetirado } from "@/lib/actions/pedidos";
 import { ProductoAutocomplete } from "@/components/producto-autocomplete";
 import { TicketConAcciones } from "@/components/ticket-actions";
 import { EstadoConexion } from "@/components/estado-conexion";
@@ -69,6 +69,7 @@ export default function VendedorPage() {
   } | null>(null);
   const [pedidosPagados, setPedidosPagados] = useState<PedidoPagado[]>([]);
   const [mostrarTodosPagados, setMostrarTodosPagados] = useState(false);
+  const [retirandoId, setRetirandoId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -90,6 +91,26 @@ export default function VendedorPage() {
       setPedidosPagados(await listarPedidosPagadosRecientes(limite));
     } catch {
       // Sin conexión: se mantiene la última lista que se pudo traer.
+    }
+  }
+
+  async function confirmarRetiro(p: PedidoPagado) {
+    if (
+      !window.confirm(
+        `¿Confirmás que el cliente retiró el pedido Nº ${String(p.numeroPedido).padStart(3, "0")}?`,
+      )
+    )
+      return;
+    setRetirandoId(p.id);
+    try {
+      await marcarRetirado({
+        pedidoId: p.id,
+        usuario: getUsuario() || "V1",
+        dispositivo: getDispositivoId(),
+      });
+      await refrescarPagados();
+    } finally {
+      setRetirandoId(null);
     }
   }
 
@@ -357,7 +378,28 @@ export default function VendedorPage() {
                   </TableCell>
                   <TableCell className="text-right">${p.total}</TableCell>
                   <TableCell>
-                    <Badge>Puede retirar</Badge>
+                    {p.estado === "retirado" ? (
+                      <Badge variant="secondary">
+                        Retirado{" "}
+                        {p.retiradoEn &&
+                          new Date(p.retiradoEn).toLocaleTimeString("es-AR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                      </Badge>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Badge>Puede retirar</Badge>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={retirandoId === p.id}
+                          onClick={() => confirmarRetiro(p)}
+                        >
+                          Retirado
+                        </Button>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

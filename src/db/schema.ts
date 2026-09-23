@@ -16,6 +16,7 @@ export const tipoStockEnum = pgEnum("tipo_stock", ["libre", "controlado"]);
 export const estadoPedidoEnum = pgEnum("estado_pedido", [
   "creado",
   "cobrado",
+  "retirado",
   "cancelado",
 ]);
 export const origenItemEnum = pgEnum("origen_item_pedido", [
@@ -72,6 +73,7 @@ export const pedidos = pgTable(
     estado: estadoPedidoEnum("estado").notNull().default("creado"),
     total: numeric("total", { precision: 12, scale: 2 }).notNull(),
     creadoEn: timestamp("creado_en", { withTimezone: true }).notNull(),
+    retiradoEn: timestamp("retirado_en", { withTimezone: true }),
     sincronizadoEn: timestamp("sincronizado_en", { withTimezone: true }),
   },
   (table) => [
