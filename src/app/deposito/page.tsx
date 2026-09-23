@@ -149,7 +149,7 @@ export default function DepositoPage() {
       </div>
 
       {/* Stock persistente */}
-      <section className="border rounded-lg p-4 bg-white flex flex-col gap-3">
+      <section className="border rounded-lg p-4 bg-card flex flex-col gap-3">
         <div>
           <h2 className="font-semibold">Stock de depósito</h2>
           <p className="text-xs text-neutral-500">
@@ -209,7 +209,7 @@ export default function DepositoPage() {
       </section>
 
       {/* Movimiento manual */}
-      <section className="border rounded-lg p-4 bg-white flex flex-col gap-3">
+      <section className="border rounded-lg p-4 bg-card flex flex-col gap-3">
         <h2 className="font-semibold">Registrar entrada o ajuste</h2>
         <div className="flex gap-3 flex-wrap items-end">
           <div className="w-56">
@@ -267,7 +267,7 @@ export default function DepositoPage() {
       </section>
 
       {/* Reporte */}
-      <section className="border rounded-lg p-4 bg-white flex flex-col gap-3">
+      <section className="border rounded-lg p-4 bg-card flex flex-col gap-3">
         <h2 className="font-semibold">Reporte del día</h2>
         {reporte && reporte.length > 0 ? (
           <>

@@ -190,7 +190,7 @@ export default function VendedorPage() {
 
   if (pedidoConfirmado) {
     return (
-      <main className="flex-1 flex flex-col items-center gap-4 p-6 bg-neutral-50">
+      <main className="flex-1 flex flex-col items-center gap-4 p-6">
         <EstadoConexion />
         <h2 className="text-lg font-semibold">Pedido Nº {pedidoConfirmado.numeroPedido} generado</h2>
         <TicketConAcciones
@@ -238,7 +238,7 @@ export default function VendedorPage() {
         </Select>
       </div>
 
-      <div className="border rounded-lg p-3 flex flex-col gap-3 bg-white">
+      <div className="border rounded-lg p-3 flex flex-col gap-3 bg-card">
         <label className="text-sm font-medium">Agregar producto</label>
         <ProductoAutocomplete
           productos={productos}

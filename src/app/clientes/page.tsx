@@ -66,7 +66,7 @@ export default function ClientesPage() {
     <main className="flex-1 flex flex-col gap-4 p-4 max-w-2xl mx-auto w-full">
       <h1 className="text-xl font-bold">Clientes</h1>
 
-      <div className="border rounded-lg p-4 bg-white flex gap-3">
+      <div className="border rounded-lg p-4 bg-card flex gap-3">
         <Input
           placeholder="Nombre del cliente"
           value={nombre}

@@ -37,7 +37,7 @@ export function ProductoAutocomplete({
         onBlur={() => setTimeout(() => setAbierto(false), 150)}
       />
       {abierto && filtrados.length > 0 && (
-        <ul className="absolute z-10 mt-1 w-full bg-white border rounded-md shadow-md max-h-64 overflow-auto">
+        <ul className="absolute z-10 mt-1 w-full bg-popover border rounded-md shadow-md max-h-64 overflow-auto">
           {filtrados.map((p) => (
             <li
               key={p.id}

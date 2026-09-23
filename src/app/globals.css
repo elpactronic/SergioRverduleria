@@ -117,6 +117,61 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Paletas de color opcionales — se aplican con una clase en <html>, además de .dark si corresponde */
+.paleta-verde {
+  --background: oklch(0.98 0.015 155);
+  --primary: oklch(0.55 0.14 155);
+  --primary-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.7 0.12 155);
+  --accent: oklch(0.94 0.035 155);
+  --accent-foreground: oklch(0.32 0.08 155);
+  --sidebar-primary: oklch(0.55 0.14 155);
+}
+.dark.paleta-verde {
+  --background: oklch(0.17 0.02 155);
+  --primary: oklch(0.68 0.14 155);
+  --primary-foreground: oklch(0.15 0 0);
+  --ring: oklch(0.55 0.12 155);
+  --accent: oklch(0.26 0.05 155);
+  --accent-foreground: oklch(0.9 0.04 155);
+}
+
+.paleta-naranja {
+  --background: oklch(0.98 0.015 55);
+  --primary: oklch(0.62 0.17 45);
+  --primary-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.75 0.13 50);
+  --accent: oklch(0.94 0.04 55);
+  --accent-foreground: oklch(0.35 0.1 45);
+  --sidebar-primary: oklch(0.62 0.17 45);
+}
+.dark.paleta-naranja {
+  --background: oklch(0.17 0.02 45);
+  --primary: oklch(0.72 0.16 50);
+  --primary-foreground: oklch(0.15 0 0);
+  --ring: oklch(0.6 0.13 50);
+  --accent: oklch(0.27 0.05 50);
+  --accent-foreground: oklch(0.9 0.05 55);
+}
+
+.paleta-azul {
+  --background: oklch(0.98 0.012 250);
+  --primary: oklch(0.5 0.16 258);
+  --primary-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.7 0.11 258);
+  --accent: oklch(0.94 0.03 250);
+  --accent-foreground: oklch(0.32 0.08 258);
+  --sidebar-primary: oklch(0.5 0.16 258);
+}
+.dark.paleta-azul {
+  --background: oklch(0.17 0.02 258);
+  --primary: oklch(0.68 0.15 258);
+  --primary-foreground: oklch(0.15 0 0);
+  --ring: oklch(0.55 0.12 258);
+  --accent: oklch(0.26 0.05 258);
+  --accent-foreground: oklch(0.9 0.04 258);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

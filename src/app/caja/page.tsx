@@ -225,7 +225,7 @@ export default function CajaPage() {
         <EstadoConexion />
       </div>
 
-      <div className="border rounded-lg p-4 bg-white flex flex-col gap-3">
+      <div className="border rounded-lg p-4 bg-card flex flex-col gap-3">
         <div className="flex gap-3">
           <div className="flex-1">
             <label className="text-sm font-medium mb-1 block">Nº de pedido</label>

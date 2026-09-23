@@ -15,7 +15,7 @@ export default function Home() {
   }
 
   return (
-    <main className="flex-1 flex flex-col items-center justify-center gap-6 p-6 bg-neutral-50 relative">
+    <main className="flex-1 flex flex-col items-center justify-center gap-6 p-6 relative">
       <div className="absolute top-4 right-4">
         <UserButton />
       </div>
@@ -51,6 +51,9 @@ export default function Home() {
         </a>
         <a href="/deposito" className="underline">
           Depósito
+        </a>
+        <a href="/configuracion" className="underline">
+          Configuración
         </a>
       </div>
     </main>
