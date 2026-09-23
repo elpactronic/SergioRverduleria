@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { setSesion } from "@/lib/session";
@@ -14,7 +15,10 @@ export default function Home() {
   }
 
   return (
-    <main className="flex-1 flex flex-col items-center justify-center gap-6 p-6 bg-neutral-50">
+    <main className="flex-1 flex flex-col items-center justify-center gap-6 p-6 bg-neutral-50 relative">
+      <div className="absolute top-4 right-4">
+        <UserButton />
+      </div>
       <h1 className="text-2xl font-bold">Verdulería Rogel</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md">
         <Card>

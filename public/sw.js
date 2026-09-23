@@ -1,5 +1,9 @@
-const CACHE_NAME = "verduleria-shell-v1";
-const SHELL_URLS = ["/", "/vendedor", "/caja", "/manifest.json", "/icon.svg"];
+const CACHE_NAME = "verduleria-shell-v2";
+// Solo rutas públicas: las protegidas por login se cachean solas al visitarlas
+// autenticado (ver el handler de "fetch" más abajo), no acá. Precachear "/" o
+// "/vendedor" en la instalación (antes de iniciar sesión) guardaría la
+// redirección al login en vez de la página real.
+const SHELL_URLS = ["/sign-in", "/manifest.json", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
