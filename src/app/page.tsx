@@ -45,6 +45,9 @@ export default function Home() {
         <a href="/clientes" className="underline">
           Clientes
         </a>
+        <a href="/deposito" className="underline">
+          Depósito
+        </a>
       </div>
     </main>
   );
