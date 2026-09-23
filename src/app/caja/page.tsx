@@ -5,6 +5,7 @@ import { db, type CobroLocal } from "@/lib/offline/db";
 import { sincronizarTodo } from "@/lib/offline/sync";
 import { getDispositivoId, getUsuario } from "@/lib/session";
 import { listarPedidosRecientes, obtenerDetallePedido } from "@/lib/actions/pedidos";
+import { listarCobrosSinConciliar, cancelarCobro } from "@/lib/actions/cobros";
 import { EstadoConexion } from "@/components/estado-conexion";
 import { BotonVolver } from "@/components/boton-volver";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ const estadoLabel: Record<CobroLocal["syncStatus"], { texto: string; variant: "d
 
 type PedidoReciente = Awaited<ReturnType<typeof listarPedidosRecientes>>[number];
 type DetallePedido = Awaited<ReturnType<typeof obtenerDetallePedido>>;
+type CobroSinConciliar = Awaited<ReturnType<typeof listarCobrosSinConciliar>>[number];
 
 const estadoPedidoLabel: Record<string, { texto: string; variant: "default" | "secondary" | "destructive" }> = {
   creado: { texto: "Pendiente de cobro", variant: "secondary" },
@@ -63,6 +65,9 @@ export default function CajaPage() {
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
 
+  const [cobrosSinConciliar, setCobrosSinConciliar] = useState<CobroSinConciliar[]>([]);
+  const [cancelandoId, setCancelandoId] = useState<string | null>(null);
+
   async function refrescarCobros() {
     const todos = await db.cobrosPendientes.orderBy("registradoEn").reverse().limit(20).toArray();
     setCobros(todos);
@@ -77,18 +82,48 @@ export default function CajaPage() {
     }
   }
 
+  async function refrescarSinConciliar() {
+    try {
+      setCobrosSinConciliar(await listarCobrosSinConciliar());
+    } catch {
+      // Sin conexión: se mantiene la última lista que se pudo traer.
+    }
+  }
+
   useEffect(() => {
     (async () => {
       await refrescarCobros();
       await refrescarPedidos();
+      await refrescarSinConciliar();
     })();
     const interval = setInterval(() => {
       refrescarCobros();
       refrescarPedidos();
+      refrescarSinConciliar();
     }, 4000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mostrarTodosPedidos]);
+
+  async function cancelarCobroHuerfano(c: CobroSinConciliar) {
+    if (
+      !window.confirm(
+        `¿Cancelar el cobro de $${c.monto} cargado para el pedido Nº ${String(c.pedidoNumero).padStart(3, "0")}? No hay ningún pedido con ese número, así que este cobro nunca se va a poder conciliar.`,
+      )
+    )
+      return;
+    setCancelandoId(c.id);
+    try {
+      await cancelarCobro({
+        cobroId: c.id,
+        usuario: getUsuario() || "C1",
+        dispositivo: getDispositivoId(),
+      });
+      await refrescarSinConciliar();
+    } finally {
+      setCancelandoId(null);
+    }
+  }
 
   async function procesarCobro(numero: number, fechaPedido: string, montoStr: string) {
     await db.cobrosPendientes.add({
@@ -298,6 +333,43 @@ export default function CajaPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {cobrosSinConciliar.length > 0 && (
+        <div className="border border-amber-300 bg-amber-50 rounded-lg p-3">
+          <h2 className="text-sm font-medium mb-2 text-amber-800">
+            Cobros sin pedido asociado — revisar
+          </h2>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Pedido</TableHead>
+                <TableHead>Fecha</TableHead>
+                <TableHead className="text-right">Monto</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {cobrosSinConciliar.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell>Nº {String(c.pedidoNumero).padStart(3, "0")}</TableCell>
+                  <TableCell>{c.pedidoFecha}</TableCell>
+                  <TableCell className="text-right">${c.monto}</TableCell>
+                  <TableCell>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={cancelandoId === c.id}
+                      onClick={() => cancelarCobroHuerfano(c)}
+                    >
+                      Cancelar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {cobros.length > 0 && (
         <div>

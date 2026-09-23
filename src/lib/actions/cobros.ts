@@ -26,6 +26,48 @@ export async function listarCobrosSinConciliar() {
 }
 
 /**
+ * Cancela un cobro que quedó sin conciliar (nunca encontró su pedido, ej.
+ * número mal tipeado). Solo aplica a cobros sin_conciliar: uno ya conciliado
+ * movió stock y estado del pedido, así que cancelarlo es una devolución, no
+ * esto.
+ */
+export async function cancelarCobro(params: {
+  cobroId: string;
+  usuario: string;
+  dispositivo?: string;
+}) {
+  const db = getDb();
+  const anterior = await db.query.cobros.findFirst({
+    where: eq(cobros.id, params.cobroId),
+  });
+  if (!anterior || anterior.estado !== "sin_conciliar") {
+    throw new Error(
+      "Solo se pueden cancelar cobros sin conciliar. Un cobro ya conciliado requiere una devolución.",
+    );
+  }
+
+  const [actualizado] = await db
+    .update(cobros)
+    .set({ estado: "cancelado" })
+    .where(eq(cobros.id, params.cobroId))
+    .returning();
+
+  await registrarAuditoria({
+    operationId: crypto.randomUUID(),
+    usuario: params.usuario,
+    dispositivo: params.dispositivo,
+    accion: "CANCELAR_COBRO",
+    entidad: "cobro",
+    entidadId: params.cobroId,
+    numeroPedido: actualizado.pedidoNumero,
+    estadoAnterior: anterior,
+    estadoNuevo: actualizado,
+  });
+
+  return actualizado;
+}
+
+/**
  * Sincroniza un cobro registrado offline en caja. Idempotente por UUID.
  * Intenta conciliar contra un pedido existente por (fecha, número); si el
  * pedido todavía no llegó al servidor, queda "sin_conciliar" y se resuelve

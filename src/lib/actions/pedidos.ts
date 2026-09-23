@@ -219,7 +219,7 @@ async function conciliarCobrosPendientesDe(
     ),
   });
 
-  for (const cobro of huerfanos.filter((c) => c.pedidoId === null)) {
+  for (const cobro of huerfanos.filter((c) => c.pedidoId === null && c.estado !== "cancelado")) {
     await conciliarCobro(cobro.id, pedidoId);
   }
 }
