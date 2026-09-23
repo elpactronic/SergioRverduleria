@@ -12,6 +12,7 @@ import { EstadoConexion } from "@/components/estado-conexion";
 import { BotonVolver } from "@/components/boton-volver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -243,7 +244,17 @@ export default function VendedorPage() {
             {items.map((item, idx) => (
               <TableRow key={idx}>
                 <TableCell>{item.cantidadBultos}</TableCell>
-                <TableCell>{item.detalle}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    {item.detalle}
+                    {productos.find((p) => p.id === item.productoId)?.tipoStock ===
+                      "controlado" && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        Depósito · se descuenta
+                      </Badge>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="text-right">{item.precioUnitario}</TableCell>
                 <TableCell className="text-right">{item.total}</TableCell>
                 <TableCell>
