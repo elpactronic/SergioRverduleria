@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   listarProductosControlados,
-  obtenerApertura,
+  obtenerStockActual,
   guardarApertura,
   registrarMovimiento,
   guardarConteoFisico,
@@ -43,7 +43,8 @@ function hoyLocal() {
 export default function DepositoPage() {
   const [fecha, setFecha] = useState(hoyLocal());
   const [productos, setProductos] = useState<ProductoControlado[]>([]);
-  const [apertura, setApertura] = useState<Record<string, string>>({});
+  const [stockActual, setStockActual] = useState<Record<string, number>>({});
+  const [recuento, setRecuento] = useState<Record<string, string>>({});
   const [reporte, setReporte] = useState<FilaReporte[] | null>(null);
   const [fisico, setFisico] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
@@ -54,14 +55,15 @@ export default function DepositoPage() {
   const [movMotivo, setMovMotivo] = useState("");
 
   async function cargarTodo() {
-    const [prods, aperturaFecha] = await Promise.all([
+    const [prods, stock] = await Promise.all([
       listarProductosControlados(),
-      obtenerApertura(fecha),
+      obtenerStockActual(fecha),
     ]);
     setProductos(prods);
-    const mapa: Record<string, string> = {};
-    for (const a of aperturaFecha) mapa[a.productoId] = a.cantidadInicial;
-    setApertura(mapa);
+    const mapa: Record<string, number> = {};
+    for (const s of stock) mapa[s.productoId] = s.cantidad;
+    setStockActual(mapa);
+    setRecuento({});
   }
 
   async function cargarReporte() {
@@ -80,8 +82,8 @@ export default function DepositoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fecha]);
 
-  async function guardarAperturaDelDia() {
-    const items = Object.entries(apertura)
+  async function guardarRecuento() {
+    const items = Object.entries(recuento)
       .filter(([, cant]) => cant !== "" && cant !== undefined)
       .map(([productoId, cantidadInicial]) => ({ productoId, cantidadInicial }));
     if (items.length === 0) return;
@@ -94,6 +96,7 @@ export default function DepositoPage() {
         usuario: getUsuario() || "admin",
         dispositivo: getDispositivoId(),
       });
+      await cargarTodo();
       await cargarReporte();
     } finally {
       setGuardando(false);
@@ -145,9 +148,17 @@ export default function DepositoPage() {
         </div>
       </div>
 
-      {/* Apertura del día */}
+      {/* Stock persistente */}
       <section className="border rounded-lg p-4 bg-white flex flex-col gap-3">
-        <h2 className="font-semibold">Apertura del día</h2>
+        <div>
+          <h2 className="font-semibold">Stock de depósito</h2>
+          <p className="text-xs text-neutral-500">
+            El stock no se reinicia cada día: se acumula solo con ventas, entradas, devoluciones y
+            ajustes. Acá se ve lo que el sistema calcula que hay. Si contaste físicamente y el
+            número real es otro, cargalo en &quot;Nuevo recuento&quot; para corregirlo a partir de
+            esta fecha — no hace falta tocarlo si ya está bien.
+          </p>
+        </div>
         {productos.length === 0 && (
           <p className="text-sm text-neutral-500">
             No hay productos con stock controlado. Marcalos en la sección de Productos.
@@ -157,7 +168,8 @@ export default function DepositoPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Producto</TableHead>
-              <TableHead className="w-40">Cantidad inicial</TableHead>
+              <TableHead className="w-32 text-right">Stock actual</TableHead>
+              <TableHead className="w-40">Nuevo recuento</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -167,13 +179,17 @@ export default function DepositoPage() {
                   {p.nombre}
                   {p.variedad ? ` — ${p.variedad}` : ""}
                 </TableCell>
+                <TableCell className="text-right font-semibold">
+                  {stockActual[p.id] ?? 0}
+                </TableCell>
                 <TableCell>
                   <Input
                     type="number"
                     min="0"
-                    value={apertura[p.id] ?? ""}
+                    placeholder="—"
+                    value={recuento[p.id] ?? ""}
                     onChange={(e) =>
-                      setApertura((prev) => ({ ...prev, [p.id]: e.target.value }))
+                      setRecuento((prev) => ({ ...prev, [p.id]: e.target.value }))
                     }
                   />
                 </TableCell>
@@ -182,8 +198,12 @@ export default function DepositoPage() {
           </TableBody>
         </Table>
         {productos.length > 0 && (
-          <Button onClick={guardarAperturaDelDia} disabled={guardando} className="self-start">
-            Guardar apertura
+          <Button
+            onClick={guardarRecuento}
+            disabled={guardando || Object.values(recuento).every((v) => !v)}
+            className="self-start"
+          >
+            Guardar recuento
           </Button>
         )}
       </section>
@@ -255,7 +275,7 @@ export default function DepositoPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Producto</TableHead>
-                  <TableHead className="text-right">Apertura</TableHead>
+                  <TableHead className="text-right">Inicio día</TableHead>
                   <TableHead className="text-right">Entradas</TableHead>
                   <TableHead className="text-right">Devol.</TableHead>
                   <TableHead className="text-right">Salidas</TableHead>

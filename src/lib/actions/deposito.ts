@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, lte, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   productos,
@@ -19,11 +19,73 @@ export async function listarProductosControlados() {
   return filas;
 }
 
-export async function obtenerApertura(fecha: string) {
+/**
+ * El stock de depósito NO se reinicia todos los días: es acumulativo, y solo
+ * cambia por ventas, entradas de mercadería, devoluciones y ajustes. Un
+ * "recuento" (fila en apertura_stock) es la base desde la que se cuenta a
+ * partir de esa fecha, no una obligación diaria. Esta función calcula el
+ * stock persistente de cada producto al comienzo de una fecha dada, tomando
+ * el recuento más reciente registrado hasta ese momento y sumando todos los
+ * movimientos ocurridos después de ese recuento y antes de la fecha.
+ */
+async function calcularBaseYMovimientosHasta(fecha: string) {
   const db = getDb();
-  return db.query.aperturaStock.findMany({
-    where: eq(aperturaStock.fecha, fecha),
-  });
+  const [aperturas, movimientos] = await Promise.all([
+    db.query.aperturaStock.findMany({ where: lte(aperturaStock.fecha, fecha) }),
+    db
+      .select({
+        productoId: movimientosStock.productoId,
+        tipo: movimientosStock.tipo,
+        cantidad: movimientosStock.cantidad,
+        fecha: sql<string>`${movimientosStock.timestamp}::date`,
+      })
+      .from(movimientosStock)
+      .where(sql`${movimientosStock.timestamp}::date <= ${fecha}::date`),
+  ]);
+  return { aperturas, movimientos };
+}
+
+function netoMovimiento(tipo: string, cantidad: string): number {
+  const n = Number(cantidad);
+  if (tipo === "salida_venta") return -n;
+  return n; // entrada, devolucion y ajuste suman (un ajuste negativo se carga con cantidad negativa)
+}
+
+function stockAlInicioDelDia(
+  productoId: string,
+  fecha: string,
+  aperturas: { productoId: string; fecha: string; cantidadInicial: string }[],
+  movimientos: { productoId: string; tipo: string; cantidad: string; fecha: string }[],
+): number {
+  const aperturasProducto = aperturas.filter((a) => a.productoId === productoId);
+  const base = aperturasProducto.reduce<typeof aperturasProducto[number] | null>(
+    (mejor, a) => (!mejor || a.fecha > mejor.fecha ? a : mejor),
+    null,
+  );
+  const baseValor = base ? Number(base.cantidadInicial) : 0;
+  const baseFecha = base?.fecha ?? null;
+
+  const previos = movimientos.filter(
+    (m) =>
+      m.productoId === productoId &&
+      m.fecha < fecha &&
+      (baseFecha === null || m.fecha > baseFecha),
+  );
+
+  return previos.reduce((acc, m) => acc + netoMovimiento(m.tipo, m.cantidad), baseValor);
+}
+
+/** Stock persistente de cada producto controlado al comienzo de `fecha` (para prellenar referencias, no un formulario obligatorio). */
+export async function obtenerStockActual(fecha: string) {
+  const [controlados, { aperturas, movimientos }] = await Promise.all([
+    listarProductosControlados(),
+    calcularBaseYMovimientosHasta(fecha),
+  ]);
+
+  return controlados.map((p) => ({
+    productoId: p.id,
+    cantidad: stockAlInicioDelDia(p.id, fecha, aperturas, movimientos),
+  }));
 }
 
 export async function guardarApertura(params: {
@@ -62,7 +124,7 @@ export async function guardarApertura(params: {
     operationId: crypto.randomUUID(),
     usuario: params.usuario,
     dispositivo: params.dispositivo,
-    accion: "APERTURA_DEPOSITO",
+    accion: "RECUENTO_DEPOSITO",
     entidad: "apertura_stock",
     infoAdicional: { fecha: params.fecha, items: params.items },
   });
@@ -159,39 +221,29 @@ export interface FilaReporte {
 }
 
 export async function obtenerReporte(fecha: string): Promise<FilaReporte[]> {
-  const db = getDb();
-
-  const [controlados, aperturas, movimientos, conteos] = await Promise.all([
+  const [controlados, { aperturas, movimientos }, conteos] = await Promise.all([
     listarProductosControlados(),
-    obtenerApertura(fecha),
-    db
-      .select({
-        productoId: movimientosStock.productoId,
-        tipo: movimientosStock.tipo,
-        cantidad: movimientosStock.cantidad,
-      })
-      .from(movimientosStock)
-      .where(sql`${movimientosStock.timestamp}::date = ${fecha}::date`),
-    db.query.stockFisicoConteo.findMany({
+    calcularBaseYMovimientosHasta(fecha),
+    getDb().query.stockFisicoConteo.findMany({
       where: eq(stockFisicoConteo.fecha, fecha),
     }),
   ]);
 
   return controlados.map((producto) => {
-    const apertura = Number(
-      aperturas.find((a) => a.productoId === producto.id)?.cantidadInicial ?? 0,
-    );
-    const movsDelProducto = movimientos.filter((m) => m.productoId === producto.id);
-    const entradas = movsDelProducto
+    // Stock persistente heredado de días anteriores (recuento más reciente + movimientos desde entonces).
+    const apertura = stockAlInicioDelDia(producto.id, fecha, aperturas, movimientos);
+
+    const movsDeHoy = movimientos.filter((m) => m.productoId === producto.id && m.fecha === fecha);
+    const entradas = movsDeHoy
       .filter((m) => m.tipo === "entrada")
       .reduce((acc, m) => acc + Number(m.cantidad), 0);
-    const devoluciones = movsDelProducto
+    const devoluciones = movsDeHoy
       .filter((m) => m.tipo === "devolucion")
       .reduce((acc, m) => acc + Number(m.cantidad), 0);
-    const salidas = movsDelProducto
+    const salidas = movsDeHoy
       .filter((m) => m.tipo === "salida_venta")
       .reduce((acc, m) => acc + Number(m.cantidad), 0);
-    const ajustes = movsDelProducto
+    const ajustes = movsDeHoy
       .filter((m) => m.tipo === "ajuste")
       .reduce((acc, m) => acc + Number(m.cantidad), 0);
     const teorico = apertura + entradas + devoluciones - salidas + ajustes;

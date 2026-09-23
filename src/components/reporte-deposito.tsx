@@ -23,7 +23,7 @@ export const ReporteDeposito = forwardRef<HTMLDivElement, ReporteDepositoProps>(
           <thead>
             <tr className="border-b border-black">
               <th className="text-left py-1">Producto</th>
-              <th className="text-right py-1">Apertura</th>
+              <th className="text-right py-1">Inicio día</th>
               <th className="text-right py-1">Entradas</th>
               <th className="text-right py-1">Devol.</th>
               <th className="text-right py-1">Salidas</th>
