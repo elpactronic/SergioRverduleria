@@ -78,6 +78,8 @@ export default function CajaPage() {
   const [errorCancelacion, setErrorCancelacion] = useState<string | null>(null);
   const [cancelandoPedido, setCancelandoPedido] = useState(false);
 
+  const [mostrarCobrosLocales, setMostrarCobrosLocales] = useState(false);
+
   async function refrescarCobros() {
     const todos = await db.cobrosPendientes.orderBy("registradoEn").reverse().limit(20).toArray();
     setCobros(todos);
@@ -475,31 +477,41 @@ export default function CajaPage() {
 
       {cobros.length > 0 && (
         <div>
-          <h2 className="text-sm font-medium mb-2">Últimos cobros de este dispositivo</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Pedido</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead className="text-right">Monto</TableHead>
-                <TableHead>Estado</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {cobros.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell>Nº {String(c.pedidoNumero).padStart(3, "0")}</TableCell>
-                  <TableCell>{c.pedidoFecha}</TableCell>
-                  <TableCell className="text-right">${c.monto}</TableCell>
-                  <TableCell>
-                    <Badge variant={estadoLabel[c.syncStatus].variant}>
-                      {estadoLabel[c.syncStatus].texto}
-                    </Badge>
-                  </TableCell>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-medium">Últimos cobros de este dispositivo</h2>
+            <button
+              className="text-xs underline text-neutral-500"
+              onClick={() => setMostrarCobrosLocales((v) => !v)}
+            >
+              {mostrarCobrosLocales ? "Ocultar" : "Mostrar"}
+            </button>
+          </div>
+          {mostrarCobrosLocales && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Pedido</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead className="text-right">Monto</TableHead>
+                  <TableHead>Estado</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {cobros.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell>Nº {String(c.pedidoNumero).padStart(3, "0")}</TableCell>
+                    <TableCell>{c.pedidoFecha}</TableCell>
+                    <TableCell className="text-right">${c.monto}</TableCell>
+                    <TableCell>
+                      <Badge variant={estadoLabel[c.syncStatus].variant}>
+                        {estadoLabel[c.syncStatus].texto}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </div>
       )}
     </main>
