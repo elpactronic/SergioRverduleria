@@ -1,12 +1,13 @@
 "use server";
 
-import { and, eq, max } from "drizzle-orm";
+import { and, desc, eq, max } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   pedidos,
   pedidoItems,
   movimientosStock,
   cobros,
+  clientes,
 } from "@/db/schema";
 import { registrarAuditoria } from "./audit";
 
@@ -39,6 +40,27 @@ export async function obtenerUltimoNumeroPedido(fecha: string) {
     .from(pedidos)
     .where(eq(pedidos.fecha, fecha));
   return fila?.max ?? 0;
+}
+
+/** Lista los pedidos más recientes (todos los dispositivos), para mostrar en caja/vendedor. */
+export async function listarPedidosRecientes(limite = 5) {
+  const db = getDb();
+  const filas = await db
+    .select({
+      id: pedidos.id,
+      numeroPedido: pedidos.numeroPedido,
+      fecha: pedidos.fecha,
+      clienteNombre: clientes.nombre,
+      total: pedidos.total,
+      estado: pedidos.estado,
+      creadoEn: pedidos.creadoEn,
+    })
+    .from(pedidos)
+    .leftJoin(clientes, eq(pedidos.clienteId, clientes.id))
+    .orderBy(desc(pedidos.creadoEn))
+    .limit(limite);
+
+  return filas;
 }
 
 /**

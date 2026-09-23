@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { db, type CobroLocal } from "@/lib/offline/db";
 import { sincronizarTodo } from "@/lib/offline/sync";
 import { getDispositivoId, getUsuario } from "@/lib/session";
+import { listarPedidosRecientes } from "@/lib/actions/pedidos";
 import { EstadoConexion } from "@/components/estado-conexion";
 import { BotonVolver } from "@/components/boton-volver";
 import { Button } from "@/components/ui/button";
@@ -31,24 +32,48 @@ const estadoLabel: Record<CobroLocal["syncStatus"], { texto: string; variant: "d
   error: { texto: "Error", variant: "destructive" },
 };
 
+type PedidoReciente = Awaited<ReturnType<typeof listarPedidosRecientes>>[number];
+
+const estadoPedidoLabel: Record<string, { texto: string; variant: "default" | "secondary" | "destructive" }> = {
+  creado: { texto: "Pendiente de cobro", variant: "secondary" },
+  cobrado: { texto: "Cobrado", variant: "default" },
+  cancelado: { texto: "Cancelado", variant: "destructive" },
+};
+
 export default function CajaPage() {
   const [numeroPedido, setNumeroPedido] = useState("");
   const [fecha, setFecha] = useState(hoyLocal());
   const [monto, setMonto] = useState("");
   const [cobros, setCobros] = useState<CobroLocal[]>([]);
+  const [pedidosRecientes, setPedidosRecientes] = useState<PedidoReciente[]>([]);
+  const [mostrarTodosPedidos, setMostrarTodosPedidos] = useState(false);
 
   async function refrescarCobros() {
     const todos = await db.cobrosPendientes.orderBy("registradoEn").reverse().limit(20).toArray();
     setCobros(todos);
   }
 
+  async function refrescarPedidos() {
+    try {
+      const limite = mostrarTodosPedidos ? 50 : 5;
+      setPedidosRecientes(await listarPedidosRecientes(limite));
+    } catch {
+      // Sin conexión: se mantiene la última lista que se pudo traer.
+    }
+  }
+
   useEffect(() => {
     (async () => {
       await refrescarCobros();
+      await refrescarPedidos();
     })();
-    const interval = setInterval(refrescarCobros, 4000);
+    const interval = setInterval(() => {
+      refrescarCobros();
+      refrescarPedidos();
+    }, 4000);
     return () => clearInterval(interval);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mostrarTodosPedidos]);
 
   async function registrarCobro() {
     const numero = parseInt(numeroPedido, 10);
@@ -68,7 +93,10 @@ export default function CajaPage() {
     setNumeroPedido("");
     setMonto("");
     await refrescarCobros();
-    sincronizarTodo().then(refrescarCobros);
+    sincronizarTodo().then(() => {
+      refrescarCobros();
+      refrescarPedidos();
+    });
   }
 
   return (
@@ -116,6 +144,53 @@ export default function CajaPage() {
           Registrar cobro y autorizar retiro
         </Button>
       </div>
+
+      {pedidosRecientes.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-medium">
+              {mostrarTodosPedidos ? "Pedidos recientes" : "Últimos 5 pedidos"}
+            </h2>
+            <button
+              className="text-xs underline text-neutral-500"
+              onClick={() => setMostrarTodosPedidos((v) => !v)}
+            >
+              {mostrarTodosPedidos ? "Mostrar menos" : "Mostrar todos"}
+            </button>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Pedido</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Hora</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead>Estado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pedidosRecientes.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell>Nº {String(p.numeroPedido).padStart(3, "0")}</TableCell>
+                  <TableCell>{p.clienteNombre ?? "Consumidor final"}</TableCell>
+                  <TableCell>
+                    {new Date(p.creadoEn).toLocaleTimeString("es-AR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </TableCell>
+                  <TableCell className="text-right">${p.total}</TableCell>
+                  <TableCell>
+                    <Badge variant={estadoPedidoLabel[p.estado].variant}>
+                      {estadoPedidoLabel[p.estado].texto}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {cobros.length > 0 && (
         <div>
