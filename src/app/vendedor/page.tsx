@@ -9,6 +9,7 @@ import { getDispositivoId, getUsuario } from "@/lib/session";
 import { ProductoAutocomplete } from "@/components/producto-autocomplete";
 import { TicketConAcciones } from "@/components/ticket-actions";
 import { EstadoConexion } from "@/components/estado-conexion";
+import { BotonVolver } from "@/components/boton-volver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -157,7 +158,10 @@ export default function VendedorPage() {
   return (
     <main className="flex-1 flex flex-col gap-4 p-4 max-w-2xl mx-auto w-full">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Nuevo pedido</h1>
+        <div className="flex items-center gap-2">
+          <BotonVolver mensaje="¿Salir sin terminar el pedido? Se perderá lo que cargaste." />
+          <h1 className="text-xl font-bold">Nuevo pedido</h1>
+        </div>
         <EstadoConexion />
       </div>
 

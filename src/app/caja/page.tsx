@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { db, type CobroLocal } from "@/lib/offline/db";
 import { sincronizarTodo } from "@/lib/offline/sync";
 import { getDispositivoId, getUsuario } from "@/lib/session";
 import { EstadoConexion } from "@/components/estado-conexion";
+import { BotonVolver } from "@/components/boton-volver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -74,7 +74,10 @@ export default function CajaPage() {
   return (
     <main className="flex-1 flex flex-col gap-4 p-4 max-w-2xl mx-auto w-full">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Registrar cobro</h1>
+        <div className="flex items-center gap-2">
+          <BotonVolver mensaje="¿Salir de caja? Se perderá el cobro que no registraste." />
+          <h1 className="text-xl font-bold">Registrar cobro</h1>
+        </div>
         <EstadoConexion />
       </div>
 
@@ -143,10 +146,6 @@ export default function CajaPage() {
           </Table>
         </div>
       )}
-
-      <Link href="/" className="text-sm underline text-neutral-500">
-        Volver al inicio
-      </Link>
     </main>
   );
 }
