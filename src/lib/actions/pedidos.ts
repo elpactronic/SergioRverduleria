@@ -63,6 +63,28 @@ export async function listarPedidosRecientes(limite = 5) {
   return filas;
 }
 
+/** Lista los pedidos ya pagados más recientes, ordenados por cuándo se cobraron (no por cuándo se crearon). */
+export async function listarPedidosPagadosRecientes(limite = 5) {
+  const db = getDb();
+  const filas = await db
+    .select({
+      id: pedidos.id,
+      numeroPedido: pedidos.numeroPedido,
+      fecha: pedidos.fecha,
+      clienteNombre: clientes.nombre,
+      total: pedidos.total,
+      cobradoEn: cobros.registradoEn,
+    })
+    .from(pedidos)
+    .innerJoin(cobros, eq(cobros.pedidoId, pedidos.id))
+    .leftJoin(clientes, eq(pedidos.clienteId, clientes.id))
+    .where(eq(pedidos.estado, "cobrado"))
+    .orderBy(desc(cobros.registradoEn))
+    .limit(limite);
+
+  return filas;
+}
+
 /** Trae un pedido con sus ítems y el nombre del cliente, para la pantalla de confirmación de cobro. */
 export async function obtenerDetallePedido(pedidoId: string) {
   const db = getDb();

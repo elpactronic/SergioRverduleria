@@ -6,6 +6,7 @@ import { db, type ClienteCache, type ProductoCache } from "@/lib/offline/db";
 import { siguienteNumeroPedido } from "@/lib/offline/numero-pedido";
 import { sincronizarTodo, actualizarCatalogosLocales } from "@/lib/offline/sync";
 import { getDispositivoId, getUsuario } from "@/lib/session";
+import { listarPedidosPagadosRecientes } from "@/lib/actions/pedidos";
 import { ProductoAutocomplete } from "@/components/producto-autocomplete";
 import { TicketConAcciones } from "@/components/ticket-actions";
 import { EstadoConexion } from "@/components/estado-conexion";
@@ -39,6 +40,8 @@ interface ItemForm {
   origen: "mostrador" | "deposito";
 }
 
+type PedidoPagado = Awaited<ReturnType<typeof listarPedidosPagadosRecientes>>[number];
+
 function hoyLocal() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -64,6 +67,8 @@ export default function VendedorPage() {
     items: ItemForm[];
     total: string;
   } | null>(null);
+  const [pedidosPagados, setPedidosPagados] = useState<PedidoPagado[]>([]);
+  const [mostrarTodosPagados, setMostrarTodosPagados] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -78,6 +83,24 @@ export default function VendedorPage() {
       setProductos(await db.productosCache.toArray());
     })();
   }, []);
+
+  async function refrescarPagados() {
+    try {
+      const limite = mostrarTodosPagados ? 50 : 5;
+      setPedidosPagados(await listarPedidosPagadosRecientes(limite));
+    } catch {
+      // Sin conexión: se mantiene la última lista que se pudo traer.
+    }
+  }
+
+  useEffect(() => {
+    (async () => {
+      await refrescarPagados();
+    })();
+    const interval = setInterval(refrescarPagados, 5000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mostrarTodosPagados]);
 
   function agregarItem() {
     if (!productoSeleccionado || !cantidad || !precio) return;
@@ -297,6 +320,51 @@ export default function VendedorPage() {
       <div className="text-xs text-neutral-400 text-center">
         Fecha: {hoyLocal()} · Funciona sin conexión, se sincroniza solo
       </div>
+
+      {pedidosPagados.length > 0 && (
+        <div className="border-t pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-medium">
+              {mostrarTodosPagados ? "Pedidos pagados" : "Últimos 5 pedidos pagados"}
+            </h2>
+            <button
+              className="text-xs underline text-neutral-500"
+              onClick={() => setMostrarTodosPagados((v) => !v)}
+            >
+              {mostrarTodosPagados ? "Mostrar menos" : "Mostrar todos"}
+            </button>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Pedido</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Hora pago</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pedidosPagados.map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell>Nº {String(p.numeroPedido).padStart(3, "0")}</TableCell>
+                  <TableCell>{p.clienteNombre ?? "Consumidor final"}</TableCell>
+                  <TableCell>
+                    {new Date(p.cobradoEn).toLocaleTimeString("es-AR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </TableCell>
+                  <TableCell className="text-right">${p.total}</TableCell>
+                  <TableCell>
+                    <Badge>Puede retirar</Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </main>
   );
 }
