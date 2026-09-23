@@ -150,6 +150,7 @@ export interface FilaReporte {
   variedad: string | null;
   apertura: number;
   entradas: number;
+  devoluciones: number;
   salidas: number;
   ajustes: number;
   teorico: number;
@@ -184,13 +185,16 @@ export async function obtenerReporte(fecha: string): Promise<FilaReporte[]> {
     const entradas = movsDelProducto
       .filter((m) => m.tipo === "entrada")
       .reduce((acc, m) => acc + Number(m.cantidad), 0);
+    const devoluciones = movsDelProducto
+      .filter((m) => m.tipo === "devolucion")
+      .reduce((acc, m) => acc + Number(m.cantidad), 0);
     const salidas = movsDelProducto
       .filter((m) => m.tipo === "salida_venta")
       .reduce((acc, m) => acc + Number(m.cantidad), 0);
     const ajustes = movsDelProducto
       .filter((m) => m.tipo === "ajuste")
       .reduce((acc, m) => acc + Number(m.cantidad), 0);
-    const teorico = apertura + entradas - salidas + ajustes;
+    const teorico = apertura + entradas + devoluciones - salidas + ajustes;
     const conteo = conteos.find((c) => c.productoId === producto.id);
     const fisico = conteo ? Number(conteo.cantidadContada) : null;
 
@@ -200,6 +204,7 @@ export async function obtenerReporte(fecha: string): Promise<FilaReporte[]> {
       variedad: producto.variedad,
       apertura,
       entradas,
+      devoluciones,
       salidas,
       ajustes,
       teorico,

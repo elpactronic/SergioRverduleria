@@ -271,3 +271,83 @@ export async function conciliarCobro(cobroId: string, pedidoId: string) {
 
   return pedidoActualizado;
 }
+
+/**
+ * Cancela un pedido (haya sido pagado o no) con motivo obligatorio y PIN de
+ * autorización. Si tenía ítems de depósito ya descontados (cobrado o
+ * retirado), genera un movimiento de devolución por cada uno para que el
+ * stock teórico vuelva a subir — nunca se borra el movimiento de salida
+ * original, así el historial completo queda trazable.
+ */
+export async function cancelarPedido(params: {
+  pedidoId: string;
+  motivo: string;
+  pin: string;
+  usuario: string;
+  dispositivo?: string;
+}) {
+  const pinCorrecto = process.env.PIN_CANCELACION || "1234";
+  if (params.pin !== pinCorrecto) {
+    throw new Error("PIN incorrecto.");
+  }
+  if (!params.motivo.trim()) {
+    throw new Error("El motivo es obligatorio.");
+  }
+
+  const db = getDb();
+  const anterior = await db.query.pedidos.findFirst({
+    where: eq(pedidos.id, params.pedidoId),
+  });
+  if (!anterior) {
+    throw new Error("El pedido no existe.");
+  }
+  if (anterior.estado === "cancelado") {
+    throw new Error("Este pedido ya estaba cancelado.");
+  }
+
+  const estabaPagado = anterior.estado === "cobrado" || anterior.estado === "retirado";
+
+  if (estabaPagado) {
+    const itemsDelPedido = await db
+      .select({
+        productoId: pedidoItems.productoId,
+        cantidad: pedidoItems.cantidadBultos,
+        origen: pedidoItems.origen,
+      })
+      .from(pedidoItems)
+      .where(eq(pedidoItems.pedidoId, params.pedidoId));
+
+    for (const item of itemsDelPedido.filter((i) => i.origen === "deposito")) {
+      await db.insert(movimientosStock).values({
+        productoId: item.productoId,
+        tipo: "devolucion",
+        cantidad: item.cantidad,
+        pedidoId: params.pedidoId,
+        motivo: params.motivo,
+        registradoPor: params.usuario,
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  const [actualizado] = await db
+    .update(pedidos)
+    .set({ estado: "cancelado" })
+    .where(eq(pedidos.id, params.pedidoId))
+    .returning();
+
+  await registrarAuditoria({
+    operationId: crypto.randomUUID(),
+    usuario: params.usuario,
+    dispositivo: params.dispositivo,
+    accion: "CANCELAR_PEDIDO",
+    entidad: "pedido",
+    entidadId: params.pedidoId,
+    numeroPedido: actualizado.numeroPedido,
+    estadoAnterior: anterior,
+    estadoNuevo: actualizado,
+    infoAdicional: { motivo: params.motivo, estabaPagado },
+  });
+
+  return actualizado;
+}

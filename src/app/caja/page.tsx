@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { db, type CobroLocal } from "@/lib/offline/db";
 import { sincronizarTodo } from "@/lib/offline/sync";
 import { getDispositivoId, getUsuario } from "@/lib/session";
-import { listarPedidosRecientes, obtenerDetallePedido } from "@/lib/actions/pedidos";
+import {
+  listarPedidosRecientes,
+  obtenerDetallePedido,
+  cancelarPedido,
+} from "@/lib/actions/pedidos";
 import { listarCobrosSinConciliar, cancelarCobro } from "@/lib/actions/cobros";
 import { EstadoConexion } from "@/components/estado-conexion";
 import { BotonVolver } from "@/components/boton-volver";
@@ -67,6 +71,12 @@ export default function CajaPage() {
 
   const [cobrosSinConciliar, setCobrosSinConciliar] = useState<CobroSinConciliar[]>([]);
   const [cancelandoId, setCancelandoId] = useState<string | null>(null);
+
+  const [pedidoACancelar, setPedidoACancelar] = useState<PedidoReciente | null>(null);
+  const [motivoCancelacion, setMotivoCancelacion] = useState("");
+  const [pinCancelacion, setPinCancelacion] = useState("");
+  const [errorCancelacion, setErrorCancelacion] = useState<string | null>(null);
+  const [cancelandoPedido, setCancelandoPedido] = useState(false);
 
   async function refrescarCobros() {
     const todos = await db.cobrosPendientes.orderBy("registradoEn").reverse().limit(20).toArray();
@@ -175,6 +185,34 @@ export default function CajaPage() {
     }
   }
 
+  function abrirCancelarPedido(p: PedidoReciente) {
+    setPedidoACancelar(p);
+    setMotivoCancelacion("");
+    setPinCancelacion("");
+    setErrorCancelacion(null);
+  }
+
+  async function confirmarCancelacionPedido() {
+    if (!pedidoACancelar) return;
+    setErrorCancelacion(null);
+    setCancelandoPedido(true);
+    try {
+      await cancelarPedido({
+        pedidoId: pedidoACancelar.id,
+        motivo: motivoCancelacion,
+        pin: pinCancelacion,
+        usuario: getUsuario() || "C1",
+        dispositivo: getDispositivoId(),
+      });
+      setPedidoACancelar(null);
+      await refrescarPedidos();
+    } catch (err) {
+      setErrorCancelacion(err instanceof Error ? err.message : "No se pudo cancelar.");
+    } finally {
+      setCancelandoPedido(false);
+    }
+  }
+
   return (
     <main className="flex-1 flex flex-col gap-4 p-4 max-w-2xl mx-auto w-full">
       <div className="flex items-center justify-between">
@@ -263,11 +301,23 @@ export default function CajaPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {p.estado === "creado" && (
-                      <Button size="sm" variant="outline" onClick={() => abrirCobroDesdePedido(p)}>
-                        Cobrar
-                      </Button>
-                    )}
+                    <div className="flex gap-2">
+                      {p.estado === "creado" && (
+                        <Button size="sm" variant="outline" onClick={() => abrirCobroDesdePedido(p)}>
+                          Cobrar
+                        </Button>
+                      )}
+                      {(p.estado === "creado" || p.estado === "cobrado" || p.estado === "retirado") && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => abrirCancelarPedido(p)}
+                        >
+                          Cancelar
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -329,6 +379,58 @@ export default function CajaPage() {
             </Button>
             <Button onClick={confirmarCobroDesdeDialogo} disabled={confirmando || !montoDialogo}>
               Confirmar cobro y autorizar retiro
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!pedidoACancelar} onOpenChange={(open) => !open && setPedidoACancelar(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Cancelar pedido Nº{" "}
+              {pedidoACancelar ? String(pedidoACancelar.numeroPedido).padStart(3, "0") : ""}
+            </DialogTitle>
+          </DialogHeader>
+
+          {pedidoACancelar && (pedidoACancelar.estado === "cobrado" || pedidoACancelar.estado === "retirado") && (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-2">
+              Este pedido ya estaba {pedidoACancelar.estado === "retirado" ? "retirado" : "cobrado"}.
+              Si tenía productos de depósito, el stock se repone automáticamente al cancelar.
+            </p>
+          )}
+
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Motivo (obligatorio)</label>
+              <Input
+                value={motivoCancelacion}
+                onChange={(e) => setMotivoCancelacion(e.target.value)}
+                placeholder="Ej. el cliente se arrepintió, error de carga..."
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">PIN de autorización</label>
+              <Input
+                type="password"
+                inputMode="numeric"
+                value={pinCancelacion}
+                onChange={(e) => setPinCancelacion(e.target.value)}
+              />
+            </div>
+            {errorCancelacion && <p className="text-sm text-red-600">{errorCancelacion}</p>}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPedidoACancelar(null)}>
+              Volver
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmarCancelacionPedido}
+              disabled={cancelandoPedido || !motivoCancelacion.trim() || !pinCancelacion}
+            >
+              Confirmar cancelación
             </Button>
           </DialogFooter>
         </DialogContent>

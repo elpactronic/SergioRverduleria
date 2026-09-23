@@ -257,6 +257,7 @@ export default function DepositoPage() {
                   <TableHead>Producto</TableHead>
                   <TableHead className="text-right">Apertura</TableHead>
                   <TableHead className="text-right">Entradas</TableHead>
+                  <TableHead className="text-right">Devol.</TableHead>
                   <TableHead className="text-right">Salidas</TableHead>
                   <TableHead className="text-right">Ajustes</TableHead>
                   <TableHead className="text-right">Teórico</TableHead>
@@ -273,6 +274,7 @@ export default function DepositoPage() {
                     </TableCell>
                     <TableCell className="text-right">{f.apertura}</TableCell>
                     <TableCell className="text-right">{f.entradas}</TableCell>
+                    <TableCell className="text-right">{f.devoluciones}</TableCell>
                     <TableCell className="text-right">{f.salidas}</TableCell>
                     <TableCell className="text-right">{f.ajustes}</TableCell>
                     <TableCell className="text-right font-semibold">{f.teorico}</TableCell>

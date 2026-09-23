@@ -27,6 +27,7 @@ export const tipoMovimientoEnum = pgEnum("tipo_movimiento", [
   "salida_venta",
   "entrada",
   "ajuste",
+  "devolucion",
 ]);
 
 export const clientes = pgTable("clientes", {
