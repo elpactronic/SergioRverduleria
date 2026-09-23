@@ -63,6 +63,28 @@ export async function listarPedidosRecientes(limite = 5) {
   return filas;
 }
 
+/** Trae un pedido con sus ítems y el nombre del cliente, para la pantalla de confirmación de cobro. */
+export async function obtenerDetallePedido(pedidoId: string) {
+  const db = getDb();
+  const pedido = await db.query.pedidos.findFirst({
+    where: eq(pedidos.id, pedidoId),
+  });
+  if (!pedido) return null;
+
+  const [cliente, items] = await Promise.all([
+    pedido.clienteId
+      ? db.query.clientes.findFirst({ where: eq(clientes.id, pedido.clienteId) })
+      : Promise.resolve(null),
+    db.query.pedidoItems.findMany({ where: eq(pedidoItems.pedidoId, pedidoId) }),
+  ]);
+
+  return {
+    ...pedido,
+    clienteNombre: cliente?.nombre ?? "Consumidor final",
+    items,
+  };
+}
+
 /**
  * Sincroniza un pedido creado offline. Idempotente por UUID: si ya existe
  * (reintento de sync) no lo duplica. Si el producto es de stock controlado,
