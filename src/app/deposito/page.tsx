@@ -196,7 +196,12 @@ export default function DepositoPage() {
             <label className="text-xs">Producto</label>
             <Select value={movProductoId} onValueChange={(v) => setMovProductoId(v ?? "")}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Seleccionar" />
+                <SelectValue placeholder="Seleccionar">
+                  {(value: string | null) => {
+                    const p = productos.find((pr) => pr.id === value);
+                    return p ? `${p.nombre}${p.variedad ? " — " + p.variedad : ""}` : "Seleccionar";
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {productos.map((p) => (
@@ -215,7 +220,9 @@ export default function DepositoPage() {
               onValueChange={(v) => setMovTipo((v ?? "entrada") as "entrada" | "ajuste")}
             >
               <SelectTrigger className="w-full">
-                <SelectValue />
+                <SelectValue>
+                  {(value: string | null) => (value === "ajuste" ? "Ajuste (+/-)" : "Entrada")}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="entrada">Entrada</SelectItem>

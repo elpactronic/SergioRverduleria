@@ -116,7 +116,11 @@ export default function ProductosPage() {
             onValueChange={(v) => setTipoStock((v ?? "libre") as "libre" | "controlado")}
           >
             <SelectTrigger className="w-48">
-              <SelectValue />
+              <SelectValue>
+                {(value: string | null) =>
+                  value === "controlado" ? "Con stock controlado (depósito)" : "Sin stock controlado"
+                }
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="libre">Sin stock controlado</SelectItem>

@@ -165,7 +165,11 @@ export default function VendedorPage() {
         <label className="text-sm font-medium mb-1 block">Cliente</label>
         <Select value={clienteId} onValueChange={(v) => setClienteId(v ?? "")}>
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Seleccionar cliente" />
+            <SelectValue placeholder="Seleccionar cliente">
+              {(value: string | null) =>
+                clientes.find((c) => c.id === value)?.nombre ?? "Seleccionar cliente"
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {clientes.map((c) => (
