@@ -1,3 +1,21 @@
+## /design — 2026-09-24 (revisión de consistencia visual)
+
+### TL;DR
+- 🔴 La página de inicio (`src/app/page.tsx`) usaba `<a href>` en vez de `Link` de Next.js para navegar a Productos/Clientes/Depósito/Cierre de caja/Historial/Configuración — forzaba recarga completa de página en cada click, rompiendo la navegación fluida esperada de una PWA. Corregido.
+- 🟡 "Dar de baja" en Productos y Clientes seguía en rojo (`text-red-500`) — la misma inconsistencia que ya se había corregido en Caja tras el pedido explícito del usuario de no usar rojo para "Cancelar". Alineado al mismo tratamiento neutro (`text-neutral-400`).
+- ✅ El resto es consistente: patrón de header (`BotonVolver` + título + `EstadoConexion` solo en pantallas con flujo activo offline), uso de `Badge` para estados, y el link "Volver al inicio" aparece solo en pantallas de solo-lectura/reporte (no en pantallas de transacción activa como Caja o el formulario de Vendedor) — es un patrón deliberado, no un olvido.
+
+### Flags para otros agentes
+- Para **/listo**: no hay hallazgos bloqueantes de UI, solo cosméticos y ya corregidos.
+
+### Veredicto
+✅ APROBADO — consistencia visual aceptable tras las dos correcciones menores.
+
+### Pendiente (pedido del usuario)
+El usuario quiere agregar una imagen a la página de inicio pero todavía no la tiene. Cuando la tenga: guardarla en `public/` (ej. `public/portada.jpg`) y agregarla en `src/app/page.tsx` con el componente `Image` de `next/image`.
+
+---
+
 ## Implementación — 2026-09-24, post-/pm
 
 Se completaron los dos puntos que `/pm` marcó como faltantes:
