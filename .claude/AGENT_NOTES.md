@@ -29,6 +29,17 @@
 ### Veredicto
 ⚠️ MONETIZABLE CON AJUSTES — hay margen de precio real frente a la competencia, pero el modelo debe cobrar explícitamente el trabajo de instalación (no regalarlo), y la escala está limitada por la capacidad de una sola persona dando soporte.
 
+### Refinamiento del usuario — mismo día
+El usuario planea que la mensualidad de mantenimiento incluya también ir sumando funcionalidades nuevas a medida que cada cliente las pida (no solo hosting/soporte correctivo). Riesgo real detectado: con mensualidad fija y alcance abierto, el incentivo del cliente es pedir cada vez más mientras el costo (tiempo del usuario, que ya es el cuello de botella) crece sin límite — el error clásico de pricing plano en servicios a medida.
+
+**Estructura recomendada**:
+1. La mensualidad cubre mantenimiento correctivo (arreglar lo que se rompe) + hosting + backups + un cupo chico de ajustes menores incluidos (ej. hasta 1-2 horas/mes).
+2. Funcionalidades nuevas de verdad (pantalla nueva, integración, flujo distinto) se cotizan y cobran aparte, puntualmente — no quedan dentro del número fijo.
+3. Regla simple para decidir: si se resuelve en 1-2 horas, va incluido; si es más grande, se presupuesta antes de construirlo.
+4. Ventaja a explotar: al ser el mismo código base por cliente, una función pagada por el Cliente A puede pasar a ofrecerse a futuros clientes casi sin costo adicional — el primer cliente que paga por algo nuevo, en los hechos, financia mejorar el producto para los que vengan después.
+
+**Para /pm**: si se construyen features a pedido de un cliente comercial, mantener el mismo criterio que ya rige hoy (no construir nada premium especulativo sin demanda real pagando primero).
+
 ---
 
 ## /director — 2026-09-24
