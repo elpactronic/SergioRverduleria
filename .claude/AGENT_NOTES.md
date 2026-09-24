@@ -14,6 +14,11 @@
 ### Veredicto
 ⚠️ OPORTUNIDAD MODERADA — problema real y solución validada en un negocio real, pero la venta a terceros no está validada, compite con oferta específica ya instalada (Frutto) y tiene una brecha fiscal potencialmente bloqueante. Recomiendo validar con 3-5 dueños de otras verdulerías antes de invertir en generalizar el producto.
 
+### Corrección del usuario — mismo día
+El usuario corrigió dos supuestos del análisis: (1) el mercado objetivo es **grande**, no de comercios chicos aislados — ajustar el TAM estimado hacia arriba; (2) en este mercado **no se suele emitir ticket fiscal por venta** y cada verdulería lo usaría como **herramienta de uso interno**, no como sistema de facturación al cliente final. Esto invalida el hallazgo 🔴 CRÍTICO sobre la falta de integración ARCA/ex-AFIP — no es un bloqueante de adopción en este contexto. El resto del análisis (competidor Frutto, falta de validación del flujo con otros dueños, modelo de auth compartida) sigue vigente.
+
+**Para /mono**: no asumir necesidad de facturación fiscal en el pricing/modelo de negocio; sí tener en cuenta que el mercado es grande (más volumen potencial de clientes de lo que se estimó inicialmente).
+
 ---
 
 ## /equipo — 2026-09-24 (segunda pasada)
