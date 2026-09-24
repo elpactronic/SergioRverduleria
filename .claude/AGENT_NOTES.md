@@ -1,3 +1,29 @@
+## /equipo — 2026-09-24 (segunda pasada)
+
+### Proyecto
+Verdulería Rogel — PWA interna offline-first para un solo negocio (pedidos, cobros, stock, cierre de caja, auditoría, login Clerk compartido). Clasificación sin cambios: **B) PROYECTO PEQUEÑO**.
+
+### Equipo recomendado
+- **Obligatorios**: `/seguridad` ✅ resuelto, `/qa` ✅ resuelto, `/listo` ⏳ pendiente (único que falta)
+- **Opcionales**: `/cto` ✅ (bloqueante de "sin remoto" ya resuelto hoy), `/pm` ✅ (sus 2 gaps ya implementados), `/design` ✅ (consistencia visual corregida)
+- **Innecesarios**: `/director`, `/mono`, `/ia`, `/mobile`, `/legal`, `/startup`
+
+### Orden de ejecución
+```
+Ya ejecutado: /seguridad → /qa → /cto → /pm → /design
+FASE FINAL: → /listo
+```
+
+### TL;DR
+- **Tipo de usuario**: 2 roles internos (vendedor, cajero) de una sola verdulería real.
+- **Restricción principal**: ya existe remoto de GitHub (`elpactronic/SergioRverduleria`, pusheado hoy) y el proyecto está linkeado a Vercel (`.vercel/project.json`), pero **todavía no hubo un `vercel deploy --prod` real**.
+- **Objetivo**: cerrar el ciclo de auditoría con `/listo` — todos los hallazgos previos de seguridad, QA, CTO y producto ya están resueltos y commiteados.
+
+### Primer paso
+Ejecutar `/listo` — es el único agente obligatorio que falta, y no debería encontrar bloqueantes nuevos más allá del deploy real a producción (que es un paso de ejecución, no de auditoría).
+
+---
+
 ## /design — 2026-09-24 (revisión de consistencia visual)
 
 ### TL;DR
