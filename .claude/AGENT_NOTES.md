@@ -1,3 +1,21 @@
+## /director — 2026-09-24
+
+### TL;DR
+- 🔴 Ya existe un competidor específico para el rubro: **Frutto**, un POS para verdulerías/fruterías en Google Play — la idea de "nicho sin atender" no es cierta, hay que competir, no descubrir un espacio vacío.
+- 🔴 **Sin facturación electrónica ARCA (ex-AFIP)** — bloqueante duro de adopción para cualquier verdulería que facture en blanco. Ni Verdulería Rogel ni la conversación previa lo contemplan.
+- 🟡 El flujo "pedido con vendedor + cobro con cajero al retirar + depósito separado" fue diseñado para UN negocio real y nunca se validó con otro dueño de verdulería — puede no generalizar (una verdulería de mostrador puro no necesita ese flujo).
+
+### Flags para otros agentes
+- Para **/mono**: el modelo de negocio realista no es SaaS self-serve — es "productized service" (instalación 1-a-1 por cliente, vos armás cada deploy). Evaluar pricing en base a lo que cobra la competencia local (Fudo: $22.500-$69.500 ARS/mes) como referencia de disposición a pagar, no inventar un número.
+- Para **/seguridad**: el modelo de auth compartida (un login + PIN + passkey por dispositivo) fue pensado para máxima confianza familiar — para un cliente externo desconocido es una promesa de seguridad más débil de lo esperable. Revisar si esto necesita cambiar antes de vender a terceros.
+- Para **/legal**: cuando corresponda evaluarlo, la ausencia de facturación fiscal (ARCA) puede ser tanto un tema legal/compliance como de producto — coordinar.
+- Para **/listo**: no recomendaría que el veredicto de lanzamiento (uso interno actual) se condicione a la oportunidad comercial — son decisiones independientes. El sistema puede aprobarse para uso interno hoy, y la vía comercial seguir en validación aparte.
+
+### Veredicto
+⚠️ OPORTUNIDAD MODERADA — problema real y solución validada en un negocio real, pero la venta a terceros no está validada, compite con oferta específica ya instalada (Frutto) y tiene una brecha fiscal potencialmente bloqueante. Recomiendo validar con 3-5 dueños de otras verdulerías antes de invertir en generalizar el producto.
+
+---
+
 ## /equipo — 2026-09-24 (segunda pasada)
 
 ### Proyecto
