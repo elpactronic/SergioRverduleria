@@ -1,3 +1,20 @@
+## /mono — 2026-09-24
+
+### TL;DR
+- 🔴 El revenue leak real no es de features gratis — es de **tiempo de instalación no cobrado**: el modelo de "instalación separada por cliente" regala la parte más cara (tu trabajo de setup) si solo se cobra una mensualidad.
+- ✅ Precio con espacio grande frente a la competencia: Fudo cobra $22.500-$69.500 ARS/mes por un POS de restaurantes; Verdulería Rogel puede posicionarse en $10.000-$25.000/mes + fee de instalación y seguir siendo una ganga percibida.
+- 🟠 El negocio entero depende de una sola persona (soporte, mantenimiento, cobro manual) — el límite real de crecimiento es tu tiempo, no el tamaño del mercado (que ya se confirmó grande).
+
+### Flags para otros agentes
+- Para **/pm**: no construir ningún feature "premium" nuevo todavía — vender lo que ya existe. Recién evaluar tiers de producto después de tener 3+ clientes pagando.
+- Para **/cto**: si esto escala más allá de 5-6 clientes, conviene evaluar consolidar el hosting (ej. un solo Postgres/Neon con bases separadas por cliente en vez de N proyectos pagos) para no multiplicar costos de infra innecesariamente — pero no antes de tener esa demanda real.
+- Para **/listo**: la vía comercial sigue en etapa de validación (ver `/director`), no debería condicionar el veredicto de uso interno actual.
+
+### Veredicto
+⚠️ MONETIZABLE CON AJUSTES — hay margen de precio real frente a la competencia, pero el modelo debe cobrar explícitamente el trabajo de instalación (no regalarlo), y la escala está limitada por la capacidad de una sola persona dando soporte.
+
+---
+
 ## /director — 2026-09-24
 
 ### TL;DR
