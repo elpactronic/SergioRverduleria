@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, gte, inArray, max } from "drizzle-orm";
+import { and, desc, eq, inArray, max } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   pedidos,
@@ -8,9 +8,9 @@ import {
   movimientosStock,
   cobros,
   clientes,
-  auditLog,
 } from "@/db/schema";
 import { registrarAuditoria } from "./audit";
+import { verificarPinConLimite } from "./configuracion";
 
 export interface PedidoItemSync {
   productoId: string;
@@ -287,43 +287,17 @@ export async function cancelarPedido(params: {
   usuario: string;
   dispositivo?: string;
 }) {
-  const pinCorrecto = process.env.PIN_CANCELACION;
-  if (!pinCorrecto) {
-    // Nunca caer en un default conocido: si falta la config, se bloquea todo.
-    throw new Error(
-      "El sistema no tiene un PIN de cancelación configurado. Avisá al administrador.",
-    );
-  }
-
-  const db = getDb();
-
-  const quinceMinutosAtras = new Date(Date.now() - 15 * 60 * 1000);
-  const intentosRecientes = await db.query.auditLog.findMany({
-    where: and(
-      eq(auditLog.accion, "INTENTO_CANCELACION_FALLIDO"),
-      gte(auditLog.timestamp, quinceMinutosAtras),
-    ),
+  await verificarPinConLimite({
+    pin: params.pin,
+    usuario: params.usuario,
+    dispositivo: params.dispositivo,
+    entidadId: params.pedidoId,
   });
-  if (intentosRecientes.length >= 5) {
-    throw new Error(
-      "Demasiados intentos de PIN incorrecto. Esperá 15 minutos antes de volver a intentar.",
-    );
-  }
-
-  if (params.pin !== pinCorrecto) {
-    await registrarAuditoria({
-      operationId: crypto.randomUUID(),
-      usuario: params.usuario,
-      dispositivo: params.dispositivo,
-      accion: "INTENTO_CANCELACION_FALLIDO",
-      entidad: "pedido",
-      entidadId: params.pedidoId,
-    });
-    throw new Error("PIN incorrecto.");
-  }
   if (!params.motivo.trim()) {
     throw new Error("El motivo es obligatorio.");
   }
+
+  const db = getDb();
 
   const anterior = await db.query.pedidos.findFirst({
     where: eq(pedidos.id, params.pedidoId),

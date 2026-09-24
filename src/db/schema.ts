@@ -172,3 +172,11 @@ export const auditLog = pgTable("audit_log", {
   infoAdicional: jsonb("info_adicional"),
   timestamp: timestamp("timestamp", { withTimezone: true }).notNull(),
 });
+
+/** Fila única de configuración de la app (el PIN de cancelación, etc.), editable desde /configuracion sin redeploy. */
+export const configuracionApp = pgTable("configuracion_app", {
+  id: text("id").primaryKey().default("singleton"),
+  pinCancelacionHash: text("pin_cancelacion_hash"),
+  actualizadoEn: timestamp("actualizado_en", { withTimezone: true }),
+  actualizadoPor: text("actualizado_por"),
+});

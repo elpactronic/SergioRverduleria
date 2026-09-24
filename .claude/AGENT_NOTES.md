@@ -17,6 +17,13 @@ El usuario confirmó explícitamente: "online desde la nube + tal vez servidor l
 ### Veredicto
 ❌ NO APROBADO — dos críticos activos ahora mismo (no hipotéticos, confirmados con `vercel env ls`), pero ambos son de configuración y se resuelven en minutos, no de rediseño.
 
+### Actualización — mismo día, post-corrección
+Los 2 críticos y 2 de los 3 ALTO/MEDIO ya se resolvieron (commit `f06c8bd`): `ADMIN_EMAILS`/`PIN_CANCELACION` cargados en Vercel (los 3 ambientes), `src/proxy.ts` ahora falla cerrado, `cancelarPedido()` tiene límite de 5 intentos/15min sin default hardcodeado, cabeceras de seguridad agregadas en `next.config.ts`, y `audit_log` ahora guarda el `clerk_user_id` real además del campo "usuario" auto-reportado. Validado con build/lint limpios, curl (cabeceras) y un script contra la base real (rate limit).
+
+**Pendiente, no bloqueante**: validación de rango en montos/cantidades con Zod (MEDIO), migrar Clerk a instancia de producción antes del lanzamiento real (MEDIO), opción en `/configuracion` para cambiar el PIN sin pasar por Vercel (mejora de usabilidad pedida por el usuario). El PIN actual en producción ("123456") es explícitamente temporal — el usuario dijo que lo va a cambiar una vez que exista esa opción en la UI.
+
+**Para /listo**: los bloqueantes de seguridad ya no aplican. Los pendientes de arriba no impiden un lanzamiento a modo prueba, sí conviene resolverlos antes de depender de esto en serio todos los días.
+
 ---
 
 ## /equipo — 2026-09-23

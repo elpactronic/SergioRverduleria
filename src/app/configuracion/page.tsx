@@ -16,6 +16,8 @@ import {
   type Modo,
   type Paleta,
 } from "@/lib/tema";
+import { cambiarPin } from "@/lib/actions/configuracion";
+import { getUsuario, getDispositivoId } from "@/lib/session";
 
 const MODOS: { id: Modo; nombre: string }[] = [
   { id: "claro", nombre: "Claro" },
@@ -55,6 +57,45 @@ export default function ConfiguracionPage() {
   function quitarFondoPersonalizado() {
     setFondoState("");
     setFondoPersonalizado(null);
+  }
+
+  const [pinActual, setPinActual] = useState("");
+  const [pinNuevo, setPinNuevo] = useState("");
+  const [pinConfirmar, setPinConfirmar] = useState("");
+  const [cambiandoPin, setCambiandoPin] = useState(false);
+  const [errorPin, setErrorPin] = useState<string | null>(null);
+  const [exitoPin, setExitoPin] = useState(false);
+
+  async function guardarNuevoPin() {
+    setErrorPin(null);
+    setExitoPin(false);
+
+    if (!/^\d{6}$/.test(pinNuevo)) {
+      setErrorPin("El PIN nuevo debe tener exactamente 6 dígitos.");
+      return;
+    }
+    if (pinNuevo !== pinConfirmar) {
+      setErrorPin("El PIN nuevo y su confirmación no coinciden.");
+      return;
+    }
+
+    setCambiandoPin(true);
+    try {
+      await cambiarPin({
+        pinActual,
+        pinNuevo,
+        usuario: getUsuario() || "admin",
+        dispositivo: getDispositivoId(),
+      });
+      setExitoPin(true);
+      setPinActual("");
+      setPinNuevo("");
+      setPinConfirmar("");
+    } catch (err) {
+      setErrorPin(err instanceof Error ? err.message : "No se pudo cambiar el PIN.");
+    } finally {
+      setCambiandoPin(false);
+    }
   }
 
   return (
@@ -136,6 +177,59 @@ export default function ConfiguracionPage() {
           <p className="text-xs text-muted-foreground mt-1">
             Reemplaza el fondo de la paleta elegida por el color que quieras.
           </p>
+        </div>
+      </section>
+
+      <section className="border rounded-lg p-4 bg-card flex flex-col gap-3">
+        <div>
+          <h2 className="font-semibold">Seguridad</h2>
+          <p className="text-xs text-muted-foreground">
+            El PIN de cancelación lo pide la app antes de cancelar un pedido o revertir un cobro.
+            Se guarda cifrado, nadie puede verlo — solo se puede cambiar sabiendo el actual.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 max-w-sm">
+          <div>
+            <label className="text-sm font-medium mb-1 block">PIN actual</label>
+            <Input
+              type="password"
+              inputMode="numeric"
+              value={pinActual}
+              onChange={(e) => setPinActual(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">PIN nuevo (6 dígitos)</label>
+            <Input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              value={pinNuevo}
+              onChange={(e) => setPinNuevo(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Confirmar PIN nuevo</label>
+            <Input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              value={pinConfirmar}
+              onChange={(e) => setPinConfirmar(e.target.value)}
+            />
+          </div>
+
+          {errorPin && <p className="text-sm text-red-600">{errorPin}</p>}
+          {exitoPin && <p className="text-sm text-green-600">PIN actualizado correctamente.</p>}
+
+          <Button
+            onClick={guardarNuevoPin}
+            disabled={cambiandoPin || !pinActual || !pinNuevo || !pinConfirmar}
+            className="self-start"
+          >
+            Cambiar PIN
+          </Button>
         </div>
       </section>
 
