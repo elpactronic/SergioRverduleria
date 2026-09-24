@@ -52,6 +52,9 @@ export default function Home() {
         <a href="/deposito" className="underline">
           Depósito
         </a>
+        <a href="/cierre-caja" className="underline">
+          Cierre de caja
+        </a>
         <a href="/historial" className="underline">
           Historial
         </a>

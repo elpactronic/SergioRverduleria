@@ -298,29 +298,26 @@ export async function conciliarCobro(cobroId: string, pedidoId: string) {
 }
 
 /**
- * Cancela un pedido (haya sido pagado o no) con motivo obligatorio y PIN de
- * autorización. Si tenía ítems de depósito ya descontados (cobrado o
- * retirado), genera un movimiento de devolución por cada uno para que el
- * stock teórico vuelva a subir — nunca se borra el movimiento de salida
- * original, así el historial completo queda trazable.
+ * Cancela un pedido, haya sido pagado o no.
+ *
+ * El PIN solo se exige si el pedido YA fue cobrado o retirado: cancelar algo
+ * que todavía no tocó dinero ni stock es un simple "me equivoqué", y pedirle
+ * al vendedor que consiga el PIN del administrador para corregir un error de
+ * tipeo es fricción sin beneficio real. El motivo siempre es obligatorio, con
+ * o sin PIN, para que quede registrado el porqué.
+ *
+ * Si tenía ítems de depósito ya descontados (cobrado o retirado), genera un
+ * movimiento de devolución por cada uno para que el stock teórico vuelva a
+ * subir — nunca se borra el movimiento de salida original, así el historial
+ * completo queda trazable.
  */
 export async function cancelarPedido(params: {
   pedidoId: string;
   motivo: string;
-  pin: string;
+  pin?: string;
   usuario: string;
   dispositivo?: string;
 }) {
-  await verificarPinConLimite({
-    pin: params.pin,
-    usuario: params.usuario,
-    dispositivo: params.dispositivo,
-    entidadId: params.pedidoId,
-  });
-  if (!params.motivo.trim()) {
-    throw new Error("El motivo es obligatorio.");
-  }
-
   const db = getDb();
 
   const anterior = await db.query.pedidos.findFirst({
@@ -334,6 +331,22 @@ export async function cancelarPedido(params: {
   }
 
   const estabaPagado = anterior.estado === "cobrado" || anterior.estado === "retirado";
+
+  if (estabaPagado) {
+    if (!params.pin) {
+      throw new Error("Este pedido ya fue cobrado — hace falta el PIN para cancelarlo.");
+    }
+    await verificarPinConLimite({
+      pin: params.pin,
+      usuario: params.usuario,
+      dispositivo: params.dispositivo,
+      entidadId: params.pedidoId,
+    });
+  }
+
+  if (!params.motivo.trim()) {
+    throw new Error("El motivo es obligatorio.");
+  }
 
   if (estabaPagado) {
     const itemsDelPedido = await db
@@ -356,6 +369,13 @@ export async function cancelarPedido(params: {
         timestamp: new Date(),
       });
     }
+
+    // El cobro asociado queda "conciliado" en su propia columna, pero esa
+    // plata ya no es real — sin esto, el cierre de caja la seguiría contando.
+    await db
+      .update(cobros)
+      .set({ estado: "cancelado" })
+      .where(and(eq(cobros.pedidoId, params.pedidoId), eq(cobros.estado, "conciliado")));
   }
 
   const [actualizado] = await db

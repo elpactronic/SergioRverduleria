@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { db, type CobroLocal } from "@/lib/offline/db";
 import { sincronizarTodo } from "@/lib/offline/sync";
 import { getDispositivoId, getUsuario } from "@/lib/session";
@@ -214,13 +215,14 @@ export default function CajaPage() {
 
   async function confirmarCancelacionPedido() {
     if (!pedidoACancelar) return;
+    const requierePin = pedidoACancelar.estado === "cobrado" || pedidoACancelar.estado === "retirado";
     setErrorCancelacion(null);
     setCancelandoPedido(true);
     try {
       await cancelarPedido({
         pedidoId: pedidoACancelar.id,
         motivo: motivoCancelacion,
-        pin: pinCancelacion,
+        pin: requierePin ? pinCancelacion : undefined,
         usuario: getUsuario() || "C1",
         dispositivo: getDispositivoId(),
       });
@@ -242,6 +244,10 @@ export default function CajaPage() {
         </div>
         <EstadoConexion />
       </div>
+
+      <Link href="/cierre-caja" className="text-sm underline text-neutral-500 self-start">
+        Ver cierre de caja
+      </Link>
 
       <div className="border rounded-lg p-4 bg-card flex flex-col gap-3">
         <div className="flex gap-3">
@@ -429,15 +435,18 @@ export default function CajaPage() {
                 placeholder="Ej. el cliente se arrepintió, error de carga..."
               />
             </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">PIN de autorización</label>
-              <Input
-                type="password"
-                inputMode="numeric"
-                value={pinCancelacion}
-                onChange={(e) => setPinCancelacion(e.target.value)}
-              />
-            </div>
+            {pedidoACancelar &&
+              (pedidoACancelar.estado === "cobrado" || pedidoACancelar.estado === "retirado") && (
+                <div>
+                  <label className="text-sm font-medium mb-1 block">PIN de autorización</label>
+                  <Input
+                    type="password"
+                    inputMode="numeric"
+                    value={pinCancelacion}
+                    onChange={(e) => setPinCancelacion(e.target.value)}
+                  />
+                </div>
+              )}
             {errorCancelacion && <p className="text-sm text-red-600">{errorCancelacion}</p>}
           </div>
 
@@ -448,7 +457,12 @@ export default function CajaPage() {
             <Button
               variant="destructive"
               onClick={confirmarCancelacionPedido}
-              disabled={cancelandoPedido || !motivoCancelacion.trim() || !pinCancelacion}
+              disabled={
+                cancelandoPedido ||
+                !motivoCancelacion.trim() ||
+                ((pedidoACancelar?.estado === "cobrado" || pedidoACancelar?.estado === "retirado") &&
+                  !pinCancelacion)
+              }
             >
               Confirmar cancelación
             </Button>
