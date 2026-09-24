@@ -218,7 +218,10 @@ export default function ProductosPage() {
                   editar
                 </button>
                 {p.activo && (
-                  <button className="text-xs text-red-500 underline" onClick={() => baja(p)}>
+                  <button
+                    className="text-xs text-neutral-400 hover:text-neutral-700 underline"
+                    onClick={() => baja(p)}
+                  >
                     dar de baja
                   </button>
                 )}

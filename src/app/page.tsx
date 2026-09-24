@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,24 +44,24 @@ export default function Home() {
         </Card>
       </div>
       <div className="flex gap-4 text-sm text-neutral-500">
-        <a href="/productos" className="underline">
+        <Link href="/productos" className="underline">
           Productos
-        </a>
-        <a href="/clientes" className="underline">
+        </Link>
+        <Link href="/clientes" className="underline">
           Clientes
-        </a>
-        <a href="/deposito" className="underline">
+        </Link>
+        <Link href="/deposito" className="underline">
           Depósito
-        </a>
-        <a href="/cierre-caja" className="underline">
+        </Link>
+        <Link href="/cierre-caja" className="underline">
           Cierre de caja
-        </a>
-        <a href="/historial" className="underline">
+        </Link>
+        <Link href="/historial" className="underline">
           Historial
-        </a>
-        <a href="/configuracion" className="underline">
+        </Link>
+        <Link href="/configuracion" className="underline">
           Configuración
-        </a>
+        </Link>
       </div>
     </main>
   );

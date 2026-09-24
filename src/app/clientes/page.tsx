@@ -111,7 +111,10 @@ export default function ClientesPage() {
                   editar
                 </button>
                 {c.activo && (
-                  <button className="text-xs text-red-500 underline" onClick={() => baja(c)}>
+                  <button
+                    className="text-xs text-neutral-400 hover:text-neutral-700 underline"
+                    onClick={() => baja(c)}
+                  >
                     dar de baja
                   </button>
                 )}
