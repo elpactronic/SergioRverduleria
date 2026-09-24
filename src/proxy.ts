@@ -17,19 +17,21 @@ export default clerkMiddleware(async (auth, req) => {
   await auth.protect();
   const { userId, sessionId } = await auth();
 
-  if (EMAILS_PERMITIDOS.length > 0 && userId) {
-    const client = await clerkClient();
-    const usuario = await client.users.getUser(userId);
-    const email = usuario.primaryEmailAddress?.emailAddress?.toLowerCase();
+  // Falla CERRADO: si por lo que sea no hay lista de emails configurada, se
+  // bloquea todo en vez de dejar pasar a cualquier cuenta autenticada. Es
+  // preferible que la app quede inaccesible por un rato a que quede abierta.
+  const client = await clerkClient();
+  const usuario = userId ? await client.users.getUser(userId) : null;
+  const email = usuario?.primaryEmailAddress?.emailAddress?.toLowerCase();
 
-    if (!email || !EMAILS_PERMITIDOS.includes(email)) {
-      // No es el admin autorizado: se revoca la sesión (no solo se redirige,
-      // para que no quede logueado esperando otra oportunidad) y se manda al login.
-      if (sessionId) {
-        await client.sessions.revokeSession(sessionId).catch(() => {});
-      }
-      return NextResponse.redirect(new URL("/sign-in", req.url));
+  if (EMAILS_PERMITIDOS.length === 0 || !email || !EMAILS_PERMITIDOS.includes(email)) {
+    // No es el admin autorizado (o falta la configuración): se revoca la
+    // sesión, no solo se redirige, para que no quede logueado esperando
+    // otra oportunidad.
+    if (sessionId) {
+      await client.sessions.revokeSession(sessionId).catch(() => {});
     }
+    return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 });
 

@@ -161,6 +161,7 @@ export const auditLog = pgTable("audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
   operationId: uuid("operation_id").notNull(),
   usuario: text("usuario").notNull(),
+  clerkUserId: text("clerk_user_id"),
   dispositivo: text("dispositivo"),
   accion: text("accion").notNull(),
   entidad: text("entidad").notNull(),
