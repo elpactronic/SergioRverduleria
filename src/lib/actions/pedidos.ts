@@ -227,11 +227,35 @@ async function conciliarCobrosPendientesDe(
 
 export async function conciliarCobro(cobroId: string, pedidoId: string) {
   const db = getDb();
+
+  const pedidoAntes = await db.query.pedidos.findFirst({ where: eq(pedidos.id, pedidoId) });
+  if (!pedidoAntes) {
+    throw new Error("El pedido no existe.");
+  }
+
   const [cobroActualizado] = await db
     .update(cobros)
     .set({ pedidoId, estado: "conciliado" })
     .where(eq(cobros.id, cobroId))
     .returning();
+
+  if (pedidoAntes.estado !== "creado") {
+    // Idempotente: este pedido ya habia sido conciliado antes (doble clic,
+    // doble sincronizacion, dos cobros para el mismo numero). Se deja el
+    // cobro vinculado para que no quede huerfano, pero NO se vuelve a
+    // descontar stock ni a duplicar la autorizacion de retiro.
+    await registrarAuditoria({
+      operationId: crypto.randomUUID(),
+      usuario: cobroActualizado.cajeroId,
+      dispositivo: cobroActualizado.dispositivoId,
+      accion: "COBRO_DUPLICADO_IGNORADO",
+      entidad: "cobro",
+      entidadId: cobroActualizado.id,
+      numeroPedido: pedidoAntes.numeroPedido,
+      infoAdicional: { estadoDelPedido: pedidoAntes.estado },
+    });
+    return pedidoAntes;
+  }
 
   const [pedidoActualizado] = await db
     .update(pedidos)

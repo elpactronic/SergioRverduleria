@@ -116,8 +116,9 @@ export default function ProductosPage() {
     setStockInicial("");
   }
 
-  async function baja(id: string) {
-    await darDeBajaProducto({ id, usuario: getUsuario() || "admin", dispositivo: getDispositivoId() });
+  async function baja(p: Producto) {
+    if (!window.confirm(`¿Dar de baja "${p.nombre}${p.variedad ? " — " + p.variedad : ""}"?`)) return;
+    await darDeBajaProducto({ id: p.id, usuario: getUsuario() || "admin", dispositivo: getDispositivoId() });
     refrescar();
   }
 
@@ -217,7 +218,7 @@ export default function ProductosPage() {
                   editar
                 </button>
                 {p.activo && (
-                  <button className="text-xs text-red-500 underline" onClick={() => baja(p.id)}>
+                  <button className="text-xs text-red-500 underline" onClick={() => baja(p)}>
                     dar de baja
                   </button>
                 )}

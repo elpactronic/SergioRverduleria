@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { db, type ClienteCache, type ProductoCache } from "@/lib/offline/db";
+import { db, type ClienteCache, type ProductoCache, type PedidoLocal } from "@/lib/offline/db";
 import { siguienteNumeroPedido } from "@/lib/offline/numero-pedido";
 import { sincronizarTodo, actualizarCatalogosLocales } from "@/lib/offline/sync";
 import { getDispositivoId, getUsuario } from "@/lib/session";
@@ -70,6 +70,10 @@ export default function VendedorPage() {
   const [pedidosPagados, setPedidosPagados] = useState<PedidoPagado[]>([]);
   const [mostrarTodosPagados, setMostrarTodosPagados] = useState(false);
   const [retirandoId, setRetirandoId] = useState<string | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
+  const [misPedidos, setMisPedidos] = useState<PedidoLocal[]>([]);
+  const [mostrarMisPedidos, setMostrarMisPedidos] = useState(false);
+  const [reintentandoId, setReintentandoId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -91,6 +95,22 @@ export default function VendedorPage() {
       setPedidosPagados(await listarPedidosPagadosRecientes(limite));
     } catch {
       // Sin conexión: se mantiene la última lista que se pudo traer.
+    }
+  }
+
+  async function refrescarMisPedidos() {
+    const todos = await db.pedidosPendientes.orderBy("creadoEn").reverse().limit(15).toArray();
+    setMisPedidos(todos);
+  }
+
+  async function reintentarPedido(p: PedidoLocal) {
+    setReintentandoId(p.id);
+    try {
+      await db.pedidosPendientes.update(p.id, { syncStatus: "pendiente", syncError: undefined });
+      await sincronizarTodo();
+      await refrescarMisPedidos();
+    } finally {
+      setReintentandoId(null);
     }
   }
 
@@ -117,14 +137,22 @@ export default function VendedorPage() {
   useEffect(() => {
     (async () => {
       await refrescarPagados();
+      await refrescarMisPedidos();
     })();
-    const interval = setInterval(refrescarPagados, 5000);
+    const interval = setInterval(() => {
+      refrescarPagados();
+      refrescarMisPedidos();
+    }, 5000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mostrarTodosPagados]);
 
   function agregarItem() {
     if (!productoSeleccionado || !cantidad || !precio) return;
+    if (Number(cantidad) <= 0 || Number(precio) <= 0) {
+      alert("La cantidad y el precio tienen que ser mayores a cero.");
+      return;
+    }
     const total = (Number(cantidad) * Number(precio)).toFixed(2);
     setItems((prev) => [
       ...prev,
@@ -155,37 +183,43 @@ export default function VendedorPage() {
   const totalPedido = items.reduce((acc, i) => acc + Number(i.total), 0).toFixed(2);
 
   async function confirmarPedido() {
-    if (items.length === 0) return;
-    const cliente = clientes.find((c) => c.id === clienteId);
-    const { numero, fecha } = await siguienteNumeroPedido();
-    const id = crypto.randomUUID();
-    const creadoEn = new Date().toISOString();
+    if (items.length === 0 || confirmando) return;
+    setConfirmando(true);
+    try {
+      const cliente = clientes.find((c) => c.id === clienteId);
+      const { numero, fecha } = await siguienteNumeroPedido();
+      const id = crypto.randomUUID();
+      const creadoEn = new Date().toISOString();
 
-    await db.pedidosPendientes.add({
-      id,
-      numeroPedido: numero,
-      fecha,
-      clienteId: cliente?.id ?? null,
-      clienteNombre: cliente?.nombre ?? "Consumidor final",
-      vendedorId: getUsuario() || "V1",
-      dispositivoId: getDispositivoId(),
-      items,
-      total: totalPedido,
-      creadoEn,
-      syncStatus: "pendiente",
-    });
+      await db.pedidosPendientes.add({
+        id,
+        numeroPedido: numero,
+        fecha,
+        clienteId: cliente?.id ?? null,
+        clienteNombre: cliente?.nombre ?? "Consumidor final",
+        vendedorId: getUsuario() || "V1",
+        dispositivoId: getDispositivoId(),
+        items,
+        total: totalPedido,
+        creadoEn,
+        syncStatus: "pendiente",
+      });
 
-    setPedidoConfirmado({
-      numeroPedido: numero,
-      fecha,
-      clienteNombre: cliente?.nombre ?? "Consumidor final",
-      items,
-      total: totalPedido,
-    });
-    setItems([]);
-    setClienteId("");
+      setPedidoConfirmado({
+        numeroPedido: numero,
+        fecha,
+        clienteNombre: cliente?.nombre ?? "Consumidor final",
+        items,
+        total: totalPedido,
+      });
+      setItems([]);
+      setClienteId("");
 
-    sincronizarTodo();
+      await refrescarMisPedidos();
+      sincronizarTodo().then(refrescarMisPedidos);
+    } finally {
+      setConfirmando(false);
+    }
   }
 
   if (pedidoConfirmado) {
@@ -333,8 +367,8 @@ export default function VendedorPage() {
 
       <div className="flex justify-between items-center border-t pt-3">
         <span className="font-bold">Total: ${totalPedido}</span>
-        <Button size="lg" disabled={items.length === 0} onClick={confirmarPedido}>
-          Confirmar pedido e imprimir
+        <Button size="lg" disabled={items.length === 0 || confirmando} onClick={confirmarPedido}>
+          {confirmando ? "Confirmando..." : "Confirmar pedido e imprimir"}
         </Button>
       </div>
 
@@ -405,6 +439,69 @@ export default function VendedorPage() {
               ))}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {misPedidos.length > 0 && (
+        <div className="border-t pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-medium">Mis pedidos en este dispositivo</h2>
+            <button
+              className="text-xs underline text-neutral-500"
+              onClick={() => setMostrarMisPedidos((v) => !v)}
+            >
+              {mostrarMisPedidos ? "Ocultar" : "Mostrar"}
+            </button>
+          </div>
+          {mostrarMisPedidos && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Pedido</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {misPedidos.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell>Nº {String(p.numeroPedido).padStart(3, "0")}</TableCell>
+                    <TableCell className="text-right">${p.total}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          p.syncStatus === "error"
+                            ? "destructive"
+                            : p.syncStatus === "sincronizado"
+                              ? "default"
+                              : "secondary"
+                        }
+                      >
+                        {p.syncStatus === "error"
+                          ? "No se pudo enviar"
+                          : p.syncStatus === "sincronizado"
+                            ? "Sincronizado"
+                            : "Por sincronizar"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {p.syncStatus === "error" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={reintentandoId === p.id}
+                          onClick={() => reintentarPedido(p)}
+                        >
+                          Reintentar
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </div>
       )}
     </main>

@@ -77,12 +77,25 @@ export default function CajaPage() {
   const [pinCancelacion, setPinCancelacion] = useState("");
   const [errorCancelacion, setErrorCancelacion] = useState<string | null>(null);
   const [cancelandoPedido, setCancelandoPedido] = useState(false);
+  const [registrandoCobro, setRegistrandoCobro] = useState(false);
+  const [reintentandoCobroId, setReintentandoCobroId] = useState<string | null>(null);
 
   const [mostrarCobrosLocales, setMostrarCobrosLocales] = useState(false);
 
   async function refrescarCobros() {
     const todos = await db.cobrosPendientes.orderBy("registradoEn").reverse().limit(20).toArray();
     setCobros(todos);
+  }
+
+  async function reintentarCobro(c: CobroLocal) {
+    setReintentandoCobroId(c.id);
+    try {
+      await db.cobrosPendientes.update(c.id, { syncStatus: "pendiente", syncError: undefined });
+      await sincronizarTodo();
+      await refrescarCobros();
+    } finally {
+      setReintentandoCobroId(null);
+    }
   }
 
   async function refrescarPedidos() {
@@ -158,10 +171,15 @@ export default function CajaPage() {
 
   async function registrarCobro() {
     const numero = parseInt(numeroPedido, 10);
-    if (!numero || !monto) return;
-    await procesarCobro(numero, fecha, monto);
-    setNumeroPedido("");
-    setMonto("");
+    if (!numero || !monto || registrandoCobro) return;
+    setRegistrandoCobro(true);
+    try {
+      await procesarCobro(numero, fecha, monto);
+      setNumeroPedido("");
+      setMonto("");
+    } finally {
+      setRegistrandoCobro(false);
+    }
   }
 
   async function abrirCobroDesdePedido(p: PedidoReciente) {
@@ -254,10 +272,10 @@ export default function CajaPage() {
         </div>
         <Button
           size="lg"
-          disabled={!numeroPedido || !monto}
+          disabled={!numeroPedido || !monto || registrandoCobro}
           onClick={registrarCobro}
         >
-          Registrar cobro y autorizar retiro
+          {registrandoCobro ? "Registrando..." : "Registrar cobro y autorizar retiro"}
         </Button>
       </div>
 
@@ -494,6 +512,7 @@ export default function CajaPage() {
                   <TableHead>Fecha</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -506,6 +525,18 @@ export default function CajaPage() {
                       <Badge variant={estadoLabel[c.syncStatus].variant}>
                         {estadoLabel[c.syncStatus].texto}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {c.syncStatus === "error" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={reintentandoCobroId === c.id}
+                          onClick={() => reintentarCobro(c)}
+                        >
+                          Reintentar
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

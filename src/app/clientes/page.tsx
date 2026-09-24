@@ -57,8 +57,9 @@ export default function ClientesPage() {
     setNombre(c.nombre);
   }
 
-  async function baja(id: string) {
-    await darDeBajaCliente({ id, usuario: getUsuario() || "admin", dispositivo: getDispositivoId() });
+  async function baja(c: Cliente) {
+    if (!window.confirm(`¿Dar de baja a "${c.nombre}"?`)) return;
+    await darDeBajaCliente({ id: c.id, usuario: getUsuario() || "admin", dispositivo: getDispositivoId() });
     refrescar();
   }
 
@@ -110,7 +111,7 @@ export default function ClientesPage() {
                   editar
                 </button>
                 {c.activo && (
-                  <button className="text-xs text-red-500 underline" onClick={() => baja(c.id)}>
+                  <button className="text-xs text-red-500 underline" onClick={() => baja(c)}>
                     dar de baja
                   </button>
                 )}

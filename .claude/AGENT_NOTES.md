@@ -1,3 +1,21 @@
+## /qa — 2026-09-24
+
+### TL;DR
+- 🔴 Un pedido o cobro que falla al sincronizar queda en `syncStatus="error"` **para siempre, sin reintento y sin aviso visible** — `flushPedidosPendientes`/`flushCobrosPendientes` (`src/lib/offline/sync.ts`) solo re-consultan los que están en `"pendiente"`. La pantalla del vendedor nunca lee ni muestra su propia cola `pedidosPendientes`.
+- 🔴 Doble clic en "Confirmar pedido e imprimir" (`src/app/vendedor/page.tsx:336`) o en "Registrar cobro" (`src/app/caja/page.tsx:258`) — ninguno tiene guard de "procesando". El primero puede duplicar `numeroPedido` (race en `siguienteNumeroPedido()`, get+put sin transacción); el segundo puede duplicar la conciliación y **descontar stock dos veces**, porque `conciliarCobro()` no chequea si el pedido ya estaba `cobrado` antes de insertar el movimiento.
+- 🟡 "Dar de baja" en Productos/Clientes no pide confirmación (inconsistente con el resto de la app); `agregarItem()` en vendedor acepta cantidad/precio `"0"` o negativo sin avisar.
+
+### Flags para otros agentes
+- Para **/cto**: los hallazgos 1 y 2 son de arquitectura (falta de idempotencia y de mecanismo de reintento), no de UI — probablemente les interese revisar el patrón completo antes de aprobar el diseño offline-first para producción real.
+- Para **/pm**: recomiendo priorizar el fix de "doble clic" (guard de procesando + idempotencia en conciliarCobro) por encima de cualquier feature nueva — es rápido y cierra el riesgo más serio del sistema.
+- Para **/seguridad**: la falta de idempotencia en `conciliarCobro` es explotable igual de fácil por un doble clic accidental que por un ataque deliberado (relacionado con la falta de rate-limit que ya documentaste, pero es un problema distinto: acá no hace falta ninguna intención maliciosa).
+- Para **/listo**: no recomendaría autorizar uso diario sin supervisión hasta resolver al menos el punto 1 (sync silenciosamente perdido) — es una pérdida de venta invisible para el dueño del negocio.
+
+### Veredicto
+❌ NO APTO PARA PRODUCCIÓN sin supervisión — la arquitectura es sólida, pero el mecanismo de reintento de sync (el corazón de la propuesta offline-first) tiene un agujero real: una falla transitoria se convierte en una venta perdida sin que nadie se entere.
+
+---
+
 ## Aclaración del usuario — 2026-09-23
 El usuario confirmó explícitamente: "online desde la nube + tal vez servidor local más adelante" es solo arquitectura (Vercel ahora, posible servidor local en el negocio como Fase 2 de resiliencia offline — ver conversación anterior). **No hay intención de vender esto a otros negocios.** La clasificación B) PROYECTO PEQUEÑO y la lista de agentes innecesarios (`/director`, `/mono`, `/startup`, `/legal`) del análisis de `/equipo` quedan confirmadas sin cambios.
 

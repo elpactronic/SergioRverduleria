@@ -18,10 +18,15 @@ export async function siguienteNumeroPedido(): Promise<{
   fecha: string;
 }> {
   const fecha = hoyLocal();
-  const actual = await db.contadores.get(fecha);
-  const numero = (actual?.ultimoNumero ?? 0) + 1;
-  await db.contadores.put({ fecha, ultimoNumero: numero });
-  return { numero, fecha };
+  // Envuelto en una transacción: si dos llamadas se disparan casi juntas
+  // (doble clic), Dexie las serializa en vez de dejar que ambas lean el
+  // mismo "último número" antes de que la primera escriba.
+  return db.transaction("rw", db.contadores, async () => {
+    const actual = await db.contadores.get(fecha);
+    const numero = (actual?.ultimoNumero ?? 0) + 1;
+    await db.contadores.put({ fecha, ultimoNumero: numero });
+    return { numero, fecha };
+  });
 }
 
 /**
