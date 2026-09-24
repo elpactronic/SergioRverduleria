@@ -1,3 +1,19 @@
+## /listo — 2026-09-24
+
+### TL;DR
+- 🟡 Veredicto: LISTO PARA LANZAMIENTO LIMITADO — autorizado el deploy a producción para uso interno controlado del propio negocio, no para venta a terceros.
+- 🔴 Único bloqueador real, verificado ahora mismo (`vercel project ls` + `vercel project inspect`): **no existe ningún deploy de producción** (`Latest Production URL: --`) y el proyecto de Vercel no tiene integración Git conectada, así que el push de hoy a GitHub no disparó ningún deploy.
+- 🟡 No bloqueante pero a resolver pronto: Clerk sigue con claves de desarrollo (`sk_test_`/`pk_test_`, verificado en `.env.local`).
+
+### Condiciones para GO (🟢 completo)
+- Conectar el repo de GitHub al proyecto de Vercel (o correr `vercel --prod`) y validar la app funcionando en la URL pública de punta a punta.
+- Migrar Clerk a instancia de producción antes de depender de esto todos los días sin supervisión.
+
+### Veredicto
+🟡 LISTO PARA LANZAMIENTO LIMITADO — todos los hallazgos críticos de `/seguridad`, `/qa`, `/pm` están resueltos y validados; lo único que falta es ejecutar el deploy (paso de ejecución, no de auditoría). La vía comercial (`/director`, `/mono`) queda fuera de esta autorización, sigue en validación aparte.
+
+---
+
 ## /mono — 2026-09-24
 
 ### TL;DR
