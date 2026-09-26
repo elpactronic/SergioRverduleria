@@ -32,11 +32,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-function hoyLocal() {
-  const d = new Date();
+function fechaLocalDe(fecha: Date | string) {
+  const d = new Date(fecha);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate(),
   ).padStart(2, "0")}`;
+}
+
+function hoyLocal() {
+  return fechaLocalDe(new Date());
 }
 
 const estadoLabel: Record<CobroLocal["syncStatus"], { texto: string; variant: "default" | "secondary" | "destructive" }> = {
@@ -84,7 +88,13 @@ export default function CajaPage() {
   const [mostrarCobrosLocales, setMostrarCobrosLocales] = useState(false);
 
   async function refrescarCobros() {
-    const todos = await db.cobrosPendientes.orderBy("registradoEn").reverse().limit(20).toArray();
+    const hoy = hoyLocal();
+    const todos = await db.cobrosPendientes
+      .orderBy("registradoEn")
+      .reverse()
+      .filter((c) => c.syncStatus !== "sincronizado" || fechaLocalDe(c.registradoEn) === hoy)
+      .limit(20)
+      .toArray();
     setCobros(todos);
   }
 
@@ -102,7 +112,7 @@ export default function CajaPage() {
   async function refrescarPedidos() {
     try {
       const limite = mostrarTodosPedidos ? 50 : 5;
-      setPedidosRecientes(await listarPedidosRecientes(limite));
+      setPedidosRecientes(await listarPedidosRecientes(limite, hoyLocal()));
     } catch {
       // Sin conexión: se mantiene la última lista que se pudo traer.
     }
@@ -289,7 +299,7 @@ export default function CajaPage() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-medium">
-              {mostrarTodosPedidos ? "Pedidos recientes" : "Últimos 5 pedidos"}
+              {mostrarTodosPedidos ? "Pedidos de hoy" : "Últimos 5 pedidos de hoy"}
             </h2>
             <button
               className="text-xs underline text-neutral-500"

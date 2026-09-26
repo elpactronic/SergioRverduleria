@@ -53,9 +53,6 @@ export default function Home() {
         <Link href="/deposito" className="underline">
           Depósito
         </Link>
-        <Link href="/cierre-caja" className="underline">
-          Cierre de caja
-        </Link>
         <Link href="/historial" className="underline">
           Historial
         </Link>

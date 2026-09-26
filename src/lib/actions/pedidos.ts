@@ -43,8 +43,13 @@ export async function obtenerUltimoNumeroPedido(fecha: string) {
   return fila?.max ?? 0;
 }
 
-/** Lista los pedidos más recientes (todos los dispositivos), para mostrar en caja/vendedor. */
-export async function listarPedidosRecientes(limite = 5) {
+/**
+ * Lista los pedidos más recientes de una fecha (todos los dispositivos), para
+ * mostrar en caja/vendedor. Se filtra por fecha para que la lista se "reinicie"
+ * sola cada día y no se mezcle con pedidos de días anteriores — para eso está
+ * el historial.
+ */
+export async function listarPedidosRecientes(limite = 5, fecha: string) {
   const db = getDb();
   const filas = await db
     .select({
@@ -58,6 +63,7 @@ export async function listarPedidosRecientes(limite = 5) {
     })
     .from(pedidos)
     .leftJoin(clientes, eq(pedidos.clienteId, clientes.id))
+    .where(eq(pedidos.fecha, fecha))
     .orderBy(desc(pedidos.creadoEn))
     .limit(limite);
 
