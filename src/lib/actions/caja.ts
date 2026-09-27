@@ -1,8 +1,16 @@
 "use server";
 
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { cobros } from "@/db/schema";
+import { cobros, pedidos, clientes } from "@/db/schema";
+
+export interface DetalleCobro {
+  numeroPedido: number;
+  clienteNombre: string | null;
+  monto: string;
+  estado: string;
+  registradoEn: string;
+}
 
 export interface CierreDeCaja {
   fecha: string;
@@ -12,21 +20,32 @@ export interface CierreDeCaja {
   cantidadSinConciliar: number;
   totalCancelados: string;
   cantidadCancelados: number;
+  detalle: DetalleCobro[];
 }
 
 /**
- * Cierre de caja de una fecha: cuánto se cobró de verdad (conciliado), más lo
- * que quedó sin conciliar o se canceló ese día, para que quede visible y no
- * se confunda con la plata real. Se basa en cuándo se REGISTRÓ el cobro, no
- * en la fecha del pedido (un cobro registrado hoy vale para el cierre de hoy).
+ * Cierre de caja de una fecha: el detalle de cada cobro registrado ese día
+ * (como un ticket real de cierre), más los totales por estado para que lo
+ * sin conciliar o cancelado no se confunda con la plata real. Se basa en
+ * cuándo se REGISTRÓ el cobro, no en la fecha del pedido (un cobro
+ * registrado hoy vale para el cierre de hoy).
  */
 export async function obtenerCierreDeCaja(fecha: string): Promise<CierreDeCaja> {
   const db = getDb();
 
   const cobrosDelDia = await db
-    .select({ monto: cobros.monto, estado: cobros.estado })
+    .select({
+      numeroPedido: cobros.pedidoNumero,
+      clienteNombre: clientes.nombre,
+      monto: cobros.monto,
+      estado: cobros.estado,
+      registradoEn: cobros.registradoEn,
+    })
     .from(cobros)
-    .where(sql`${cobros.registradoEn}::date = ${fecha}::date`);
+    .leftJoin(pedidos, eq(cobros.pedidoId, pedidos.id))
+    .leftJoin(clientes, eq(pedidos.clienteId, clientes.id))
+    .where(sql`${cobros.registradoEn}::date = ${fecha}::date`)
+    .orderBy(cobros.registradoEn);
 
   const porEstado = (estado: string) => cobrosDelDia.filter((c) => c.estado === estado);
   const sumar = (filas: { monto: string }[]) =>
@@ -44,5 +63,12 @@ export async function obtenerCierreDeCaja(fecha: string): Promise<CierreDeCaja> 
     cantidadSinConciliar: sinConciliar.length,
     totalCancelados: sumar(cancelados),
     cantidadCancelados: cancelados.length,
+    detalle: cobrosDelDia.map((c) => ({
+      numeroPedido: c.numeroPedido,
+      clienteNombre: c.clienteNombre,
+      monto: c.monto,
+      estado: c.estado,
+      registradoEn: c.registradoEn.toISOString(),
+    })),
   };
 }
