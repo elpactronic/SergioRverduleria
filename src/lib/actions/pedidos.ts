@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, inArray, max } from "drizzle-orm";
+import { and, desc, eq, inArray, max, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
   pedidos,
@@ -71,11 +71,13 @@ export async function listarPedidosRecientes(limite = 5, fecha: string) {
 }
 
 /**
- * Lista los pedidos ya pagados más recientes (cobrados y/o ya retirados),
+ * Lista los pedidos ya pagados de una fecha (cobrados y/o ya retirados),
  * ordenados por cuándo se cobraron. Sirve como bandeja de "para entregar"
- * y a la vez como registro de cuándo se retiró cada uno.
+ * y a la vez como registro de cuándo se retiró cada uno. Se filtra por el
+ * día del cobro para que se reinicie sola cada día — un pedido de hace
+ * varios días que sigue sin retirarse conviene revisarlo desde Historial.
  */
-export async function listarPedidosPagadosRecientes(limite = 5) {
+export async function listarPedidosPagadosRecientes(limite = 5, fecha: string) {
   const db = getDb();
   const filas = await db
     .select({
@@ -91,7 +93,12 @@ export async function listarPedidosPagadosRecientes(limite = 5) {
     .from(pedidos)
     .innerJoin(cobros, eq(cobros.pedidoId, pedidos.id))
     .leftJoin(clientes, eq(pedidos.clienteId, clientes.id))
-    .where(inArray(pedidos.estado, ["cobrado", "retirado"]))
+    .where(
+      and(
+        inArray(pedidos.estado, ["cobrado", "retirado"]),
+        sql`${cobros.registradoEn}::date = ${fecha}::date`,
+      ),
+    )
     .orderBy(desc(cobros.registradoEn))
     .limit(limite);
 

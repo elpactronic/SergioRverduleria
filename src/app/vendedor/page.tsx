@@ -7,6 +7,7 @@ import { siguienteNumeroPedido } from "@/lib/offline/numero-pedido";
 import { sincronizarTodo, actualizarCatalogosLocales } from "@/lib/offline/sync";
 import { getDispositivoId, getUsuario } from "@/lib/session";
 import { listarPedidosPagadosRecientes, marcarRetirado } from "@/lib/actions/pedidos";
+import { crearCliente } from "@/lib/actions/clientes";
 import { ProductoAutocomplete } from "@/components/producto-autocomplete";
 import { TicketConAcciones } from "@/components/ticket-actions";
 import { EstadoConexion } from "@/components/estado-conexion";
@@ -53,6 +54,10 @@ export default function VendedorPage() {
   const [clientes, setClientes] = useState<ClienteCache[]>([]);
   const [productos, setProductos] = useState<ProductoCache[]>([]);
   const [clienteId, setClienteId] = useState<string>("");
+  const [agregandoCliente, setAgregandoCliente] = useState(false);
+  const [nombreClienteNuevo, setNombreClienteNuevo] = useState("");
+  const [guardandoCliente, setGuardandoCliente] = useState(false);
+  const [errorClienteNuevo, setErrorClienteNuevo] = useState<string | null>(null);
   const [items, setItems] = useState<ItemForm[]>([]);
   const [cantidad, setCantidad] = useState("1");
   const [precio, setPrecio] = useState("");
@@ -92,7 +97,7 @@ export default function VendedorPage() {
   async function refrescarPagados() {
     try {
       const limite = mostrarTodosPagados ? 50 : 5;
-      setPedidosPagados(await listarPedidosPagadosRecientes(limite));
+      setPedidosPagados(await listarPedidosPagadosRecientes(limite, hoyLocal()));
     } catch {
       // Sin conexión: se mantiene la última lista que se pudo traer.
     }
@@ -131,6 +136,38 @@ export default function VendedorPage() {
       await refrescarPagados();
     } finally {
       setRetirandoId(null);
+    }
+  }
+
+  async function agregarClienteRapido() {
+    const nombre = nombreClienteNuevo.trim();
+    if (!nombre) return;
+    setErrorClienteNuevo(null);
+    setGuardandoCliente(true);
+    try {
+      const nuevo = await crearCliente({
+        nombre,
+        usuario: getUsuario() || "V1",
+        dispositivo: getDispositivoId(),
+      });
+      const nuevoCache = {
+        id: nuevo.id,
+        codigo: nuevo.codigo,
+        nombre: nuevo.nombre,
+        activo: nuevo.activo,
+        actualizadoEn: new Date().toISOString(),
+      };
+      await db.clientesCache.put(nuevoCache);
+      setClientes((prev) => [...prev, nuevoCache].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      setClienteId(nuevo.id);
+      setAgregandoCliente(false);
+      setNombreClienteNuevo("");
+    } catch {
+      setErrorClienteNuevo(
+        "No se pudo agregar (¿sin conexión?). Podés seguir el pedido como \"Consumidor final\" y cargar el cliente más tarde desde Clientes.",
+      );
+    } finally {
+      setGuardandoCliente(false);
     }
   }
 
@@ -254,7 +291,17 @@ export default function VendedorPage() {
 
       <div>
         <label className="text-sm font-medium mb-1 block">Cliente</label>
-        <Select value={clienteId} onValueChange={(v) => setClienteId(v ?? "")}>
+        <Select
+          value={clienteId}
+          onValueChange={(v) => {
+            if (v === "__nuevo__") {
+              setAgregandoCliente(true);
+              setErrorClienteNuevo(null);
+              return;
+            }
+            setClienteId(v ?? "");
+          }}
+        >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Seleccionar cliente">
               {(value: string | null) =>
@@ -263,6 +310,7 @@ export default function VendedorPage() {
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="__nuevo__">+ Agregar cliente nuevo</SelectItem>
             {clientes.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.nombre}
@@ -270,6 +318,38 @@ export default function VendedorPage() {
             ))}
           </SelectContent>
         </Select>
+
+        {agregandoCliente && (
+          <div className="border rounded-lg p-3 mt-2 bg-card flex flex-col gap-2">
+            <label className="text-sm font-medium">Nombre del cliente nuevo</label>
+            <div className="flex gap-2">
+              <Input
+                value={nombreClienteNuevo}
+                onChange={(e) => setNombreClienteNuevo(e.target.value)}
+                placeholder="Ej. Juan Pérez"
+                autoFocus
+              />
+              <Button onClick={agregarClienteRapido} disabled={guardandoCliente || !nombreClienteNuevo.trim()}>
+                Agregar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAgregandoCliente(false);
+                  setNombreClienteNuevo("");
+                  setErrorClienteNuevo(null);
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Se agrega solo con el nombre — el resto de los datos se puede completar después desde
+              Clientes.
+            </p>
+            {errorClienteNuevo && <p className="text-sm text-red-600">{errorClienteNuevo}</p>}
+          </div>
+        )}
       </div>
 
       <div className="border rounded-lg p-3 flex flex-col gap-3 bg-card">
@@ -380,7 +460,7 @@ export default function VendedorPage() {
         <div className="border-t pt-3">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-medium">
-              {mostrarTodosPagados ? "Pedidos pagados" : "Últimos 5 pedidos pagados"}
+              {mostrarTodosPagados ? "Pedidos pagados hoy" : "Últimos 5 pedidos pagados hoy"}
             </h2>
             <button
               className="text-xs underline text-neutral-500"
