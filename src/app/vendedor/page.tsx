@@ -9,6 +9,7 @@ import { listarPedidosPagadosRecientes, marcarRetirado } from "@/lib/actions/ped
 import { crearCliente } from "@/lib/actions/clientes";
 import { sonarCobrado, sonarRetirado } from "@/lib/sonidos";
 import { useWakeLock } from "@/lib/use-wake-lock";
+import { useSync } from "@/lib/offline/use-sync";
 import { ProductoAutocomplete } from "@/components/producto-autocomplete";
 import { TicketConAcciones } from "@/components/ticket-actions";
 import { EstadoConexion } from "@/components/estado-conexion";
@@ -82,6 +83,7 @@ export default function VendedorPage() {
   const [reintentandoId, setReintentandoId] = useState<string | null>(null);
 
   useWakeLock();
+  const { online } = useSync();
 
   const pagadosAnterioresRef = useRef<Map<string, string> | null>(null);
 
@@ -477,7 +479,8 @@ export default function VendedorPage() {
       </div>
 
       <div className="text-xs text-neutral-400 text-center">
-        Fecha: {hoyLocal()} · Funciona sin conexión, se sincroniza solo
+        Fecha: {hoyLocal()}
+        {!online && " · Sin conexión: el pedido se guarda igual y se sincroniza solo"}
       </div>
 
       {pedidosPagados.length > 0 && (
