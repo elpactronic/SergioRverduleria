@@ -290,18 +290,20 @@ export default function VendedorPage() {
       </div>
 
       <div>
-        <label className="text-sm font-medium mb-1 block">Cliente</label>
-        <Select
-          value={clienteId}
-          onValueChange={(v) => {
-            if (v === "__nuevo__") {
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm font-medium">Cliente</label>
+          <button
+            type="button"
+            className="text-xs underline text-neutral-500"
+            onClick={() => {
               setAgregandoCliente(true);
               setErrorClienteNuevo(null);
-              return;
-            }
-            setClienteId(v ?? "");
-          }}
-        >
+            }}
+          >
+            + Cliente nuevo
+          </button>
+        </div>
+        <Select value={clienteId} onValueChange={(v) => setClienteId(v ?? "")}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Seleccionar cliente">
               {(value: string | null) =>
@@ -310,7 +312,6 @@ export default function VendedorPage() {
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__nuevo__">+ Agregar cliente nuevo</SelectItem>
             {clientes.map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.nombre}
