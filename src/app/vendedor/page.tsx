@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { db, type ClienteCache, type ProductoCache, type PedidoLocal } from "@/lib/offline/db";
 import { siguienteNumeroPedido } from "@/lib/offline/numero-pedido";
@@ -8,6 +8,8 @@ import { sincronizarTodo, actualizarCatalogosLocales } from "@/lib/offline/sync"
 import { getDispositivoId, getUsuario } from "@/lib/session";
 import { listarPedidosPagadosRecientes, marcarRetirado } from "@/lib/actions/pedidos";
 import { crearCliente } from "@/lib/actions/clientes";
+import { sonarCobrado, sonarRetirado } from "@/lib/sonidos";
+import { useWakeLock } from "@/lib/use-wake-lock";
 import { ProductoAutocomplete } from "@/components/producto-autocomplete";
 import { TicketConAcciones } from "@/components/ticket-actions";
 import { EstadoConexion } from "@/components/estado-conexion";
@@ -80,6 +82,29 @@ export default function VendedorPage() {
   const [mostrarMisPedidos, setMostrarMisPedidos] = useState(false);
   const [reintentandoId, setReintentandoId] = useState<string | null>(null);
 
+  useWakeLock();
+
+  const pagadosAnterioresRef = useRef<Map<string, string> | null>(null);
+
+  function detectarCambiosPagados(nuevos: PedidoPagado[]) {
+    const anteriores = pagadosAnterioresRef.current;
+    if (anteriores) {
+      let huboCobrado = false;
+      let huboRetirado = false;
+      for (const p of nuevos) {
+        const estadoAnterior = anteriores.get(p.id);
+        if (estadoAnterior === undefined) {
+          if (p.estado === "cobrado") huboCobrado = true;
+        } else if (estadoAnterior !== p.estado && p.estado === "retirado") {
+          huboRetirado = true;
+        }
+      }
+      if (huboRetirado) sonarRetirado();
+      if (huboCobrado) sonarCobrado();
+    }
+    pagadosAnterioresRef.current = new Map(nuevos.map((p) => [p.id, p.estado]));
+  }
+
   useEffect(() => {
     (async () => {
       if (navigator.onLine) {
@@ -97,7 +122,9 @@ export default function VendedorPage() {
   async function refrescarPagados() {
     try {
       const limite = mostrarTodosPagados ? 50 : 5;
-      setPedidosPagados(await listarPedidosPagadosRecientes(limite, hoyLocal()));
+      const nuevos = await listarPedidosPagadosRecientes(limite, hoyLocal());
+      detectarCambiosPagados(nuevos);
+      setPedidosPagados(nuevos);
     } catch {
       // Sin conexión: se mantiene la última lista que se pudo traer.
     }

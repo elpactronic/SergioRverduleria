@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { db, type CobroLocal } from "@/lib/offline/db";
 import { sincronizarTodo } from "@/lib/offline/sync";
@@ -9,8 +9,11 @@ import {
   listarPedidosRecientes,
   obtenerDetallePedido,
   cancelarPedido,
+  marcarRetirado,
 } from "@/lib/actions/pedidos";
 import { listarCobrosSinConciliar, cancelarCobro } from "@/lib/actions/cobros";
+import { sonarPedidoNuevo, sonarCobrado, sonarRetirado } from "@/lib/sonidos";
+import { useWakeLock } from "@/lib/use-wake-lock";
 import { EstadoConexion } from "@/components/estado-conexion";
 import { BotonVolver } from "@/components/boton-volver";
 import { Button } from "@/components/ui/button";
@@ -86,6 +89,33 @@ export default function CajaPage() {
   const [reintentandoCobroId, setReintentandoCobroId] = useState<string | null>(null);
 
   const [mostrarCobrosLocales, setMostrarCobrosLocales] = useState(false);
+  const [retirandoId, setRetirandoId] = useState<string | null>(null);
+
+  useWakeLock();
+
+  const pedidosAnterioresRef = useRef<Map<string, string> | null>(null);
+
+  function detectarCambiosPedidos(nuevos: PedidoReciente[]) {
+    const anteriores = pedidosAnterioresRef.current;
+    if (anteriores) {
+      let huboNuevo = false;
+      let huboCobrado = false;
+      let huboRetirado = false;
+      for (const p of nuevos) {
+        const estadoAnterior = anteriores.get(p.id);
+        if (estadoAnterior === undefined) {
+          if (p.estado === "creado") huboNuevo = true;
+        } else if (estadoAnterior !== p.estado) {
+          if (p.estado === "cobrado") huboCobrado = true;
+          if (p.estado === "retirado") huboRetirado = true;
+        }
+      }
+      if (huboRetirado) sonarRetirado();
+      if (huboCobrado) sonarCobrado();
+      if (huboNuevo) sonarPedidoNuevo();
+    }
+    pedidosAnterioresRef.current = new Map(nuevos.map((p) => [p.id, p.estado]));
+  }
 
   async function refrescarCobros() {
     const hoy = hoyLocal();
@@ -112,9 +142,29 @@ export default function CajaPage() {
   async function refrescarPedidos() {
     try {
       const limite = mostrarTodosPedidos ? 50 : 5;
-      setPedidosRecientes(await listarPedidosRecientes(limite, hoyLocal()));
+      const nuevos = await listarPedidosRecientes(limite, hoyLocal());
+      detectarCambiosPedidos(nuevos);
+      setPedidosRecientes(nuevos);
     } catch {
       // Sin conexión: se mantiene la última lista que se pudo traer.
+    }
+  }
+
+  async function confirmarRetiroDesdeCaja(p: PedidoReciente) {
+    if (
+      !window.confirm(`¿Confirmás que el cliente retiró el pedido Nº ${String(p.numeroPedido).padStart(3, "0")}?`)
+    )
+      return;
+    setRetirandoId(p.id);
+    try {
+      await marcarRetirado({
+        pedidoId: p.id,
+        usuario: getUsuario() || "C1",
+        dispositivo: getDispositivoId(),
+      });
+      await refrescarPedidos();
+    } finally {
+      setRetirandoId(null);
     }
   }
 
@@ -341,6 +391,16 @@ export default function CajaPage() {
                       {p.estado === "creado" && (
                         <Button size="sm" variant="outline" onClick={() => abrirCobroDesdePedido(p)}>
                           Cobrar
+                        </Button>
+                      )}
+                      {p.estado === "cobrado" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={retirandoId === p.id}
+                          onClick={() => confirmarRetiroDesdeCaja(p)}
+                        >
+                          Retirado
                         </Button>
                       )}
                       {(p.estado === "creado" || p.estado === "cobrado" || p.estado === "retirado") && (
