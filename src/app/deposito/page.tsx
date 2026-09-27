@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   listarProductosControlados,
-  obtenerStockActual,
-  guardarApertura,
+  obtenerResumenStock,
   registrarMovimiento,
   guardarConteoFisico,
   obtenerReporte,
+  type ResumenStockDia,
   type FilaReporte,
 } from "@/lib/actions/deposito";
 import { getUsuario, getDispositivoId } from "@/lib/session";
@@ -44,11 +44,11 @@ function hoyLocal() {
 export default function DepositoPage() {
   const [fecha, setFecha] = useState(hoyLocal());
   const [productos, setProductos] = useState<ProductoControlado[]>([]);
-  const [stockActual, setStockActual] = useState<Record<string, number>>({});
-  const [recuento, setRecuento] = useState<Record<string, string>>({});
+  const [resumen, setResumen] = useState<Record<string, ResumenStockDia>>({});
   const [reporte, setReporte] = useState<FilaReporte[] | null>(null);
   const [fisico, setFisico] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
+  const [mostrarReporte, setMostrarReporte] = useState(false);
 
   const [movProductoId, setMovProductoId] = useState("");
   const [movTipo, setMovTipo] = useState<"entrada" | "ajuste">("entrada");
@@ -58,13 +58,12 @@ export default function DepositoPage() {
   async function cargarTodo() {
     const [prods, stock] = await Promise.all([
       listarProductosControlados(),
-      obtenerStockActual(fecha),
+      obtenerResumenStock(fecha),
     ]);
     setProductos(prods);
-    const mapa: Record<string, number> = {};
-    for (const s of stock) mapa[s.productoId] = s.cantidad;
-    setStockActual(mapa);
-    setRecuento({});
+    const mapa: Record<string, ResumenStockDia> = {};
+    for (const s of stock) mapa[s.productoId] = s;
+    setResumen(mapa);
   }
 
   async function cargarReporte() {
@@ -82,27 +81,6 @@ export default function DepositoPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fecha]);
-
-  async function guardarRecuento() {
-    const items = Object.entries(recuento)
-      .filter(([, cant]) => cant !== "" && cant !== undefined)
-      .map(([productoId, cantidadInicial]) => ({ productoId, cantidadInicial }));
-    if (items.length === 0) return;
-
-    setGuardando(true);
-    try {
-      await guardarApertura({
-        fecha,
-        items,
-        usuario: getUsuario() || "admin",
-        dispositivo: getDispositivoId(),
-      });
-      await cargarTodo();
-      await cargarReporte();
-    } finally {
-      setGuardando(false);
-    }
-  }
 
   async function registrarMovimientoManual() {
     if (!movProductoId || !movCantidad) return;
@@ -134,6 +112,7 @@ export default function DepositoPage() {
         usuario: getUsuario() || "admin",
         dispositivo: getDispositivoId(),
       });
+      await cargarTodo();
       await cargarReporte();
     } finally {
       setGuardando(false);
@@ -158,9 +137,10 @@ export default function DepositoPage() {
           <h2 className="font-semibold">Stock de depósito</h2>
           <p className="text-xs text-neutral-500">
             El stock no se reinicia cada día: se acumula solo con ventas, entradas, devoluciones y
-            ajustes. Acá se ve lo que el sistema calcula que hay. Si contaste físicamente y el
-            número real es otro, cargalo en &quot;Nuevo recuento&quot; para corregirlo a partir de
-            esta fecha — no hace falta tocarlo si ya está bien.
+            ajustes. &quot;Vendidos&quot; se descuenta apenas se cobra el pedido, no cuando se
+            retira — por eso puede haber vendidos que todavía no fueron retirados (siguen
+            físicamente en el depósito). Para corregir el stock según lo que contaste físicamente,
+            usá el campo &quot;Físico&quot; en el reporte del día, más abajo.
           </p>
         </div>
         {productos.length === 0 && (
@@ -172,8 +152,9 @@ export default function DepositoPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Producto</TableHead>
-              <TableHead className="w-32 text-right">Stock actual</TableHead>
-              <TableHead className="w-40">Nuevo recuento</TableHead>
+              <TableHead className="w-28 text-right">Stock inicial</TableHead>
+              <TableHead className="w-28 text-right">Vendidos hoy</TableHead>
+              <TableHead className="w-28 text-right">Retirados hoy</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -184,32 +165,14 @@ export default function DepositoPage() {
                   {p.variedad ? ` — ${p.variedad}` : ""}
                 </TableCell>
                 <TableCell className="text-right font-semibold">
-                  {stockActual[p.id] ?? 0}
+                  {resumen[p.id]?.stockInicial ?? 0}
                 </TableCell>
-                <TableCell>
-                  <Input
-                    type="number"
-                    min="0"
-                    placeholder="—"
-                    value={recuento[p.id] ?? ""}
-                    onChange={(e) =>
-                      setRecuento((prev) => ({ ...prev, [p.id]: e.target.value }))
-                    }
-                  />
-                </TableCell>
+                <TableCell className="text-right">{resumen[p.id]?.vendidos ?? 0}</TableCell>
+                <TableCell className="text-right">{resumen[p.id]?.retirados ?? 0}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-        {productos.length > 0 && (
-          <Button
-            onClick={guardarRecuento}
-            disabled={guardando || Object.values(recuento).every((v) => !v)}
-            className="self-start"
-          >
-            Guardar recuento
-          </Button>
-        )}
       </section>
 
       {/* Movimiento manual */}
@@ -272,8 +235,22 @@ export default function DepositoPage() {
 
       {/* Reporte */}
       <section className="border rounded-lg p-4 bg-card flex flex-col gap-3">
-        <h2 className="font-semibold">Reporte del día</h2>
-        {reporte && reporte.length > 0 ? (
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-semibold">Reporte del día</h2>
+            <p className="text-xs text-neutral-500">
+              Cargá &quot;Físico&quot; con lo que contaste de verdad — corrige el stock hacia
+              adelante y muestra la diferencia contra lo teórico.
+            </p>
+          </div>
+          <button
+            className="text-xs underline text-neutral-500 shrink-0"
+            onClick={() => setMostrarReporte((v) => !v)}
+          >
+            {mostrarReporte ? "Ocultar" : "Mostrar"}
+          </button>
+        </div>
+        {mostrarReporte && reporte && reporte.length > 0 ? (
           <>
             <Table>
               <TableHeader>
@@ -331,9 +308,11 @@ export default function DepositoPage() {
             </div>
           </>
         ) : (
-          <p className="text-sm text-neutral-500">
-            No hay productos con stock controlado para reportar.
-          </p>
+          mostrarReporte && (
+            <p className="text-sm text-neutral-500">
+              No hay productos con stock controlado para reportar.
+            </p>
+          )
         )}
       </section>
 

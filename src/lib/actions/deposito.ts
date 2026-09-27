@@ -7,6 +7,8 @@ import {
   aperturaStock,
   movimientosStock,
   stockFisicoConteo,
+  pedidos,
+  pedidoItems,
 } from "@/db/schema";
 import { registrarAuditoria } from "./audit";
 
@@ -75,33 +77,64 @@ function stockAlInicioDelDia(
   return previos.reduce((acc, m) => acc + netoMovimiento(m.tipo, m.cantidad), baseValor);
 }
 
-/** Stock persistente de cada producto controlado al comienzo de `fecha` (para prellenar referencias, no un formulario obligatorio). */
-export async function obtenerStockActual(fecha: string) {
-  const [controlados, { aperturas, movimientos }] = await Promise.all([
-    listarProductosControlados(),
-    calcularBaseYMovimientosHasta(fecha),
-  ]);
-
-  return controlados.map((p) => ({
-    productoId: p.id,
-    cantidad: stockAlInicioDelDia(p.id, fecha, aperturas, movimientos),
-  }));
+export interface ResumenStockDia {
+  productoId: string;
+  stockInicial: number;
+  vendidos: number;
+  retirados: number;
 }
 
-export async function guardarApertura(params: {
-  fecha: string;
-  items: { productoId: string; cantidadInicial: string }[];
-  usuario: string;
-  dispositivo?: string;
-}) {
+/**
+ * Resumen de depósito para una fecha: stock al inicio del día, cuánto se
+ * vendió (se descuenta del teórico apenas se cobra) y cuánto se retiró de
+ * verdad ese día. "Vendidos" y "retirados" pueden no coincidir — un pedido
+ * cobrado pero todavía no retirado ya está descontado del teórico aunque
+ * físicamente siga en el depósito.
+ */
+export async function obtenerResumenStock(fecha: string): Promise<ResumenStockDia[]> {
+  const db = getDb();
+  const [controlados, { aperturas, movimientos }, retiros] = await Promise.all([
+    listarProductosControlados(),
+    calcularBaseYMovimientosHasta(fecha),
+    db
+      .select({
+        productoId: pedidoItems.productoId,
+        cantidad: pedidoItems.cantidadBultos,
+      })
+      .from(pedidoItems)
+      .innerJoin(pedidos, eq(pedidoItems.pedidoId, pedidos.id))
+      .where(
+        and(eq(pedidoItems.origen, "deposito"), sql`${pedidos.retiradoEn}::date = ${fecha}::date`),
+      ),
+  ]);
+
+  return controlados.map((p) => {
+    const vendidos = movimientos
+      .filter((m) => m.productoId === p.id && m.fecha === fecha && m.tipo === "salida_venta")
+      .reduce((acc, m) => acc + Number(m.cantidad), 0);
+    const retirados = retiros
+      .filter((r) => r.productoId === p.id)
+      .reduce((acc, r) => acc + Number(r.cantidad), 0);
+
+    return {
+      productoId: p.id,
+      stockInicial: stockAlInicioDelDia(p.id, fecha, aperturas, movimientos),
+      vendidos,
+      retirados,
+    };
+  });
+}
+
+async function upsertAperturas(
+  fecha: string,
+  items: { productoId: string; cantidadInicial: string }[],
+  usuario: string,
+) {
   const db = getDb();
 
-  for (const item of params.items) {
+  for (const item of items) {
     const existente = await db.query.aperturaStock.findFirst({
-      where: and(
-        eq(aperturaStock.fecha, params.fecha),
-        eq(aperturaStock.productoId, item.productoId),
-      ),
+      where: and(eq(aperturaStock.fecha, fecha), eq(aperturaStock.productoId, item.productoId)),
     });
 
     if (existente) {
@@ -112,13 +145,22 @@ export async function guardarApertura(params: {
     } else {
       await db.insert(aperturaStock).values({
         productoId: item.productoId,
-        fecha: params.fecha,
+        fecha,
         cantidadInicial: item.cantidadInicial,
-        registradoPor: params.usuario,
+        registradoPor: usuario,
         timestamp: new Date(),
       });
     }
   }
+}
+
+export async function guardarApertura(params: {
+  fecha: string;
+  items: { productoId: string; cantidadInicial: string }[];
+  usuario: string;
+  dispositivo?: string;
+}) {
+  await upsertAperturas(params.fecha, params.items, params.usuario);
 
   await registrarAuditoria({
     operationId: crypto.randomUUID(),
@@ -164,6 +206,14 @@ export async function registrarMovimiento(params: {
   return creado;
 }
 
+/**
+ * Guarda el conteo físico del día (para mostrar la diferencia contra lo
+ * teórico) y de paso lo deja como el nuevo punto de partida hacia adelante —
+ * es el único lugar de la app donde se carga "cuánto hay realmente", así que
+ * tiene sentido que ese número sea, a la vez, la corrección. Antes esto vivía
+ * separado en "Nuevo recuento" (Stock de depósito); se unificó para no tener
+ * dos formularios haciendo casi lo mismo.
+ */
 export async function guardarConteoFisico(params: {
   fecha: string;
   items: { productoId: string; cantidadContada: string }[];
@@ -195,6 +245,12 @@ export async function guardarConteoFisico(params: {
       });
     }
   }
+
+  await upsertAperturas(
+    params.fecha,
+    params.items.map((i) => ({ productoId: i.productoId, cantidadInicial: i.cantidadContada })),
+    params.usuario,
+  );
 
   await registrarAuditoria({
     operationId: crypto.randomUUID(),
