@@ -12,6 +12,7 @@ import {
   type FilaReporte,
 } from "@/lib/actions/deposito";
 import { getUsuario, getDispositivoId } from "@/lib/session";
+import { BotonVolver } from "@/components/boton-volver";
 import { ReporteDepositoConAcciones } from "@/components/reporte-deposito-acciones";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,7 +143,10 @@ export default function DepositoPage() {
   return (
     <main className="flex-1 flex flex-col gap-6 p-4 max-w-4xl mx-auto w-full">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Depósito</h1>
+        <div className="flex items-center gap-2">
+          <BotonVolver mensaje="¿Salir de depósito? Se perderá el recuento que no guardaste." />
+          <h1 className="text-xl font-bold">Depósito</h1>
+        </div>
         <div className="w-44">
           <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </div>
