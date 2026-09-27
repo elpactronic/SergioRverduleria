@@ -15,20 +15,22 @@ export default clerkMiddleware(async (auth, req) => {
   if (esRutaPublica(req)) return;
 
   await auth.protect();
-  const { userId, sessionId } = await auth();
+  const { sessionId, sessionClaims } = await auth();
+
+  // El email viaja en el propio token de sesión (claim configurado en Clerk),
+  // en vez de pedirlo a la API de Clerk en cada request — eso agregaba un
+  // viaje de red extra a cada página del sitio.
+  const email = (sessionClaims as { email?: string } | null)?.email?.toLowerCase();
 
   // Falla CERRADO: si por lo que sea no hay lista de emails configurada, se
   // bloquea todo en vez de dejar pasar a cualquier cuenta autenticada. Es
   // preferible que la app quede inaccesible por un rato a que quede abierta.
-  const client = await clerkClient();
-  const usuario = userId ? await client.users.getUser(userId) : null;
-  const email = usuario?.primaryEmailAddress?.emailAddress?.toLowerCase();
-
   if (EMAILS_PERMITIDOS.length === 0 || !email || !EMAILS_PERMITIDOS.includes(email)) {
     // No es el admin autorizado (o falta la configuración): se revoca la
     // sesión, no solo se redirige, para que no quede logueado esperando
     // otra oportunidad.
     if (sessionId) {
+      const client = await clerkClient();
       await client.sessions.revokeSession(sessionId).catch(() => {});
     }
     return NextResponse.redirect(new URL("/sign-in", req.url));
