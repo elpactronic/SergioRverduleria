@@ -37,6 +37,7 @@ interface GrupoPedido {
   numeroPedido: number;
   fecha: string;
   eventos: EventoAudit[];
+  ultimoTimestamp: number;
 }
 
 function agrupar(eventos: EventoAudit[]): GrupoPedido[] {
@@ -45,12 +46,16 @@ function agrupar(eventos: EventoAudit[]): GrupoPedido[] {
     if (e.numeroPedido == null) continue;
     const fecha = fechaDe(e.timestamp);
     const clave = `${e.numeroPedido}-${fecha}`;
+    const ts = new Date(e.timestamp).getTime();
     if (!mapa.has(clave)) {
-      mapa.set(clave, { clave, numeroPedido: e.numeroPedido, fecha, eventos: [] });
+      mapa.set(clave, { clave, numeroPedido: e.numeroPedido, fecha, eventos: [], ultimoTimestamp: ts });
     }
-    mapa.get(clave)!.eventos.push(e);
+    const grupo = mapa.get(clave)!;
+    grupo.eventos.push(e);
+    if (ts > grupo.ultimoTimestamp) grupo.ultimoTimestamp = ts;
   }
-  return Array.from(mapa.values()).sort((a, b) => (a.clave < b.clave ? 1 : -1));
+  // Orden cronológico real (evento más reciente primero), no por número de pedido como texto.
+  return Array.from(mapa.values()).sort((a, b) => b.ultimoTimestamp - a.ultimoTimestamp);
 }
 
 export default function HistorialPage() {
