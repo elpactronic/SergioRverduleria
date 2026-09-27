@@ -177,6 +177,10 @@ export const auditLog = pgTable("audit_log", {
 export const configuracionApp = pgTable("configuracion_app", {
   id: text("id").primaryKey().default("singleton"),
   pinCancelacionHash: text("pin_cancelacion_hash"),
+  // null = sin límite, se conserva todo. Si se configura, el historial de
+  // auditoría más viejo que esto se borra automáticamente y sin posibilidad
+  // de recuperación (los pedidos y cobros en sí NO se tocan, siguen existiendo).
+  diasRetencionHistorial: integer("dias_retencion_historial"),
   actualizadoEn: timestamp("actualizado_en", { withTimezone: true }),
   actualizadoPor: text("actualizado_por"),
 });

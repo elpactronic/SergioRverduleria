@@ -16,7 +16,11 @@ import {
   type Modo,
   type Paleta,
 } from "@/lib/tema";
-import { cambiarPin } from "@/lib/actions/configuracion";
+import {
+  cambiarPin,
+  obtenerDiasRetencionHistorial,
+  guardarDiasRetencionHistorial,
+} from "@/lib/actions/configuracion";
 import { getUsuario, getDispositivoId } from "@/lib/session";
 
 const MODOS: { id: Modo; nombre: string }[] = [
@@ -29,12 +33,17 @@ export default function ConfiguracionPage() {
   const [modo, setModoState] = useState<Modo>("sistema");
   const [paleta, setPaletaState] = useState<Paleta>("neutro");
   const [fondo, setFondoState] = useState("");
+  const [diasRetencion, setDiasRetencion] = useState("");
 
   useEffect(() => {
     (() => {
       setModoState(getModo());
       setPaletaState(getPaleta());
       setFondoState(getFondoPersonalizado() ?? "");
+    })();
+    (async () => {
+      const dias = await obtenerDiasRetencionHistorial();
+      setDiasRetencion(dias === null ? "" : String(dias));
     })();
   }, []);
 
@@ -57,6 +66,28 @@ export default function ConfiguracionPage() {
   function quitarFondoPersonalizado() {
     setFondoState("");
     setFondoPersonalizado(null);
+  }
+
+  const [guardandoRetencion, setGuardandoRetencion] = useState(false);
+  const [errorRetencion, setErrorRetencion] = useState<string | null>(null);
+  const [exitoRetencion, setExitoRetencion] = useState(false);
+
+  async function guardarRetencion() {
+    setErrorRetencion(null);
+    setExitoRetencion(false);
+    setGuardandoRetencion(true);
+    try {
+      await guardarDiasRetencionHistorial({
+        dias: diasRetencion.trim() === "" ? null : parseInt(diasRetencion, 10),
+        usuario: getUsuario() || "admin",
+        dispositivo: getDispositivoId(),
+      });
+      setExitoRetencion(true);
+    } catch (err) {
+      setErrorRetencion(err instanceof Error ? err.message : "No se pudo guardar.");
+    } finally {
+      setGuardandoRetencion(false);
+    }
   }
 
   const [pinActual, setPinActual] = useState("");
@@ -229,6 +260,39 @@ export default function ConfiguracionPage() {
             className="self-start"
           >
             Cambiar PIN
+          </Button>
+        </div>
+      </section>
+
+      <section className="border rounded-lg p-4 bg-card flex flex-col gap-3">
+        <div>
+          <h2 className="font-semibold">Historial</h2>
+          <p className="text-xs text-muted-foreground">
+            Días de auditoría a conservar (creación, cobro, retiro, cancelación de pedidos). Dejalo
+            vacío para conservar todo sin límite. Si ponés un número, el historial más viejo que
+            eso se borra automáticamente y <strong>no se puede recuperar</strong> — los pedidos y
+            cobros en sí no se borran, solo el registro de auditoría que alimenta la pantalla de
+            Historial.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 max-w-sm">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Días a conservar</label>
+            <Input
+              type="number"
+              min="1"
+              placeholder="Sin límite"
+              value={diasRetencion}
+              onChange={(e) => setDiasRetencion(e.target.value)}
+            />
+          </div>
+
+          {errorRetencion && <p className="text-sm text-red-600">{errorRetencion}</p>}
+          {exitoRetencion && <p className="text-sm text-green-600">Guardado correctamente.</p>}
+
+          <Button onClick={guardarRetencion} disabled={guardandoRetencion} className="self-start">
+            Guardar
           </Button>
         </div>
       </section>

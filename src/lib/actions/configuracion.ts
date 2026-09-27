@@ -120,3 +120,56 @@ export async function hayPinConfiguradoEnBase(): Promise<boolean> {
   const fila = await obtenerFila();
   return !!fila?.pinCancelacionHash;
 }
+
+/** Días de historial de auditoría a conservar. null = sin límite (se guarda todo). */
+export async function obtenerDiasRetencionHistorial(): Promise<number | null> {
+  const fila = await obtenerFila();
+  return fila?.diasRetencionHistorial ?? null;
+}
+
+/**
+ * Configura cuántos días de historial de auditoría se conservan. Pasar `null`
+ * para volver a "sin límite". Los registros más viejos que este valor se
+ * borran automáticamente (ver `limpiarHistorialAntiguo`) y no se pueden
+ * recuperar — no afecta a los pedidos ni cobros en sí, solo al log de
+ * auditoría que alimenta la pantalla de Historial.
+ */
+export async function guardarDiasRetencionHistorial(params: {
+  dias: number | null;
+  usuario: string;
+  dispositivo?: string;
+}) {
+  if (params.dias !== null && (!Number.isInteger(params.dias) || params.dias < 1)) {
+    throw new Error("Los días a conservar deben ser un número entero de al menos 1.");
+  }
+
+  const db = getDb();
+  const existente = await obtenerFila();
+
+  if (existente) {
+    await db
+      .update(configuracionApp)
+      .set({
+        diasRetencionHistorial: params.dias,
+        actualizadoEn: new Date(),
+        actualizadoPor: params.usuario,
+      })
+      .where(eq(configuracionApp.id, SINGLETON_ID));
+  } else {
+    await db.insert(configuracionApp).values({
+      id: SINGLETON_ID,
+      diasRetencionHistorial: params.dias,
+      actualizadoEn: new Date(),
+      actualizadoPor: params.usuario,
+    });
+  }
+
+  await registrarAuditoria({
+    operationId: crypto.randomUUID(),
+    usuario: params.usuario,
+    dispositivo: params.dispositivo,
+    accion: "CAMBIAR_RETENCION_HISTORIAL",
+    entidad: "configuracion",
+    infoAdicional: { diasRetencionHistorial: params.dias },
+  });
+}

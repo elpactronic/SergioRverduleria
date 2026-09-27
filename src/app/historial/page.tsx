@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BotonVolver } from "@/components/boton-volver";
-import { buscarHistorial } from "@/lib/actions/historial";
+import { buscarHistorial, listarActividadReciente, limpiarHistorialAntiguo } from "@/lib/actions/historial";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -27,13 +27,6 @@ const ACCION_VARIANT: Record<string, "default" | "secondary" | "destructive"> = 
   CANCELAR_PEDIDO: "destructive",
   CANCELAR_COBRO: "destructive",
 };
-
-function hoyLocal() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
-}
 
 function fechaDe(fecha: Date | string) {
   return new Date(fecha).toISOString().slice(0, 10);
@@ -62,9 +55,10 @@ function agrupar(eventos: EventoAudit[]): GrupoPedido[] {
 
 export default function HistorialPage() {
   const [numeroPedido, setNumeroPedido] = useState("");
-  const [fecha, setFecha] = useState(hoyLocal());
+  const [fecha, setFecha] = useState("");
   const [eventos, setEventos] = useState<EventoAudit[] | null>(null);
   const [buscando, setBuscando] = useState(false);
+  const [diasVentana, setDiasVentana] = useState<number | null>(null);
 
   async function buscar() {
     setBuscando(true);
@@ -74,6 +68,18 @@ export default function HistorialPage() {
         fecha: fecha || undefined,
       });
       setEventos(filas);
+      setDiasVentana(null);
+    } finally {
+      setBuscando(false);
+    }
+  }
+
+  async function cargarActividadReciente() {
+    setBuscando(true);
+    try {
+      const { filas, dias } = await listarActividadReciente();
+      setEventos(filas);
+      setDiasVentana(dias);
     } finally {
       setBuscando(false);
     }
@@ -81,9 +87,9 @@ export default function HistorialPage() {
 
   useEffect(() => {
     (async () => {
-      await buscar();
+      await limpiarHistorialAntiguo().catch(() => {});
+      await cargarActividadReciente();
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const grupos = eventos ? agrupar(eventos) : [];
@@ -116,6 +122,13 @@ export default function HistorialPage() {
           Dejá la fecha vacía para buscar un número de pedido en cualquier día.
         </p>
       </div>
+
+      {diasVentana !== null && (
+        <p className="text-xs text-muted-foreground">
+          Mostrando la actividad de los últimos {diasVentana} día{diasVentana === 1 ? "" : "s"}. Se
+          puede configurar en Configuración → Historial.
+        </p>
+      )}
 
       {grupos.length === 0 && eventos !== null && (
         <p className="text-sm text-muted-foreground">No se encontró actividad con esos filtros.</p>
