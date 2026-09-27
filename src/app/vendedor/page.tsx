@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { db, type ClienteCache, type ProductoCache, type PedidoLocal } from "@/lib/offline/db";
 import { siguienteNumeroPedido } from "@/lib/offline/numero-pedido";
 import { sincronizarTodo, actualizarCatalogosLocales } from "@/lib/offline/sync";
@@ -299,9 +298,6 @@ export default function VendedorPage() {
           total={pedidoConfirmado.total}
         />
         <Button onClick={() => setPedidoConfirmado(null)}>Nuevo pedido</Button>
-        <Link href="/" className="text-sm underline text-neutral-500">
-          Volver al inicio
-        </Link>
       </main>
     );
   }
