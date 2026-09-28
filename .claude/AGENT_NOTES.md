@@ -1,3 +1,22 @@
+## /mono — 2026-09-28 (recalculado, alcance corregido)
+
+### TL;DR
+- 🔴 El alcance comercial cambió: **ya no es multi-cliente/revendible** — es un desarrollo a medida exclusivo para Verdulería Rogel, con el usuario disponible un tiempo post-entrega para correcciones. El análisis anterior de `/mono` (2026-09-24, planes por niveles, costos repartidos entre varios clientes) queda obsoleto.
+- ✅ Benchmark de mercado real para anclar el precio: un sistema de gestión a medida de esta complejidad cotiza **$1.500.000–$2.500.000 ARS** en el mercado argentino 2026 (freelance/agencia chica), independientemente de cuánto le costó al usuario construirlo con ayuda de IA.
+- 🔴 Riesgo principal: "estaré un tiempo atento a las correcciones" no tiene fecha de corte — sin un límite explícito (sugerido: 60 días), el soporte gratis tiende a extenderse indefinidamente.
+
+### Flags para otros agentes
+- Para **/pm**: no construir nada nuevo a pedido del cliente sin cotizarlo aparte, incluso durante el período de garantía — solo corregir lo que no funciona como se pactó está incluido.
+- Para **/listo**: la vía comercial queda definitivamente fuera del alcance del veredicto de lanzamiento — es un tema de contrato con el cliente, no de arquitectura ni de riesgo técnico.
+
+### Conflictos detectados
+⚡ CONFLICTO CON /mono (2026-09-24): la versión anterior recomendaba un modelo de "instalación por cliente" con fee de setup ($40.000-$120.000 ARS) + mensualidad, pensado para múltiples verdulerías ← ahora, al ser un solo cliente exclusivo, el marco correcto es un fee único de desarrollo a medida ($1.500.000-$2.500.000 ARS) + garantía de corrección con fecha de corte, sin planes ni métricas SaaS (MRR/LTV/CAC no aplican a un cliente único). Razón: el usuario confirmó el 2026-09-28 que el proyecto no será multi-tenant ni se revenderá.
+
+### Veredicto
+⚠️ MONETIZABLE CON AJUSTES — el trabajo tiene valor de mercado real y bien anclado, pero falta poner un número concreto y, sobre todo, una fecha de corte explícita al período de correcciones antes de que se vuelva soporte gratis indefinido.
+
+---
+
 ## /listo — 2026-09-24
 
 ### TL;DR
