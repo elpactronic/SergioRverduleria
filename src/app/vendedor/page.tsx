@@ -7,6 +7,8 @@ import { sincronizarTodo, actualizarCatalogosLocales } from "@/lib/offline/sync"
 import { getDispositivoId, getUsuario } from "@/lib/session";
 import { listarPedidosPagadosRecientes, marcarRetirado } from "@/lib/actions/pedidos";
 import { crearCliente } from "@/lib/actions/clientes";
+import { crearProducto } from "@/lib/actions/productos";
+import { guardarApertura } from "@/lib/actions/deposito";
 import { sonarCobrado, sonarRetirado } from "@/lib/sonidos";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import { useSync } from "@/lib/offline/use-sync";
@@ -60,6 +62,15 @@ export default function VendedorPage() {
   const [nombreClienteNuevo, setNombreClienteNuevo] = useState("");
   const [guardandoCliente, setGuardandoCliente] = useState(false);
   const [errorClienteNuevo, setErrorClienteNuevo] = useState<string | null>(null);
+
+  const [agregandoProducto, setAgregandoProducto] = useState(false);
+  const [nombreProductoNuevo, setNombreProductoNuevo] = useState("");
+  const [variedadProductoNuevo, setVariedadProductoNuevo] = useState("");
+  const [tipoStockProductoNuevo, setTipoStockProductoNuevo] = useState<"libre" | "controlado">("libre");
+  const [precioProductoNuevo, setPrecioProductoNuevo] = useState("");
+  const [stockInicialProductoNuevo, setStockInicialProductoNuevo] = useState("");
+  const [guardandoProducto, setGuardandoProducto] = useState(false);
+  const [errorProductoNuevo, setErrorProductoNuevo] = useState<string | null>(null);
   const [items, setItems] = useState<ItemForm[]>([]);
   const [cantidad, setCantidad] = useState("1");
   const [precio, setPrecio] = useState("");
@@ -196,6 +207,60 @@ export default function VendedorPage() {
       );
     } finally {
       setGuardandoCliente(false);
+    }
+  }
+
+  async function agregarProductoRapido() {
+    const nombre = nombreProductoNuevo.trim();
+    if (!nombre || !precioProductoNuevo) return;
+    setErrorProductoNuevo(null);
+    setGuardandoProducto(true);
+    try {
+      const usuario = getUsuario() || "V1";
+      const dispositivo = getDispositivoId();
+      const nuevo = await crearProducto({
+        nombre,
+        variedad: variedadProductoNuevo.trim() || undefined,
+        tipoStock: tipoStockProductoNuevo,
+        precioUnitario: precioProductoNuevo,
+        usuario,
+        dispositivo,
+      });
+
+      if (tipoStockProductoNuevo === "controlado" && stockInicialProductoNuevo.trim() !== "") {
+        await guardarApertura({
+          fecha: hoyLocal(),
+          items: [{ productoId: nuevo.id, cantidadInicial: stockInicialProductoNuevo }],
+          usuario,
+          dispositivo,
+        });
+      }
+
+      const nuevoCache = {
+        id: nuevo.id,
+        codigo: nuevo.codigo,
+        nombre: nuevo.nombre,
+        variedad: nuevo.variedad,
+        tipoStock: nuevo.tipoStock,
+        precioUnitario: nuevo.precioUnitario,
+        activo: nuevo.activo,
+        actualizadoEn: new Date().toISOString(),
+      };
+      await db.productosCache.put(nuevoCache);
+      setProductos((prev) => [...prev, nuevoCache].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+      setProductoSeleccionado(nuevoCache);
+      setPrecio(nuevoCache.precioUnitario);
+      setOrigenDeposito(false);
+      setAgregandoProducto(false);
+      setNombreProductoNuevo("");
+      setVariedadProductoNuevo("");
+      setTipoStockProductoNuevo("libre");
+      setPrecioProductoNuevo("");
+      setStockInicialProductoNuevo("");
+    } catch {
+      setErrorProductoNuevo("No se pudo agregar (¿sin conexión?). Probá de nuevo cuando haya señal, o cargalo más tarde desde Productos.");
+    } finally {
+      setGuardandoProducto(false);
     }
   }
 
@@ -379,7 +444,19 @@ export default function VendedorPage() {
       </div>
 
       <div className="border rounded-lg p-3 flex flex-col gap-3 bg-card">
-        <label className="text-sm font-medium">Agregar producto</label>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium">Agregar producto</label>
+          <button
+            type="button"
+            className="text-xs underline text-neutral-500"
+            onClick={() => {
+              setAgregandoProducto(true);
+              setErrorProductoNuevo(null);
+            }}
+          >
+            + Producto nuevo
+          </button>
+        </div>
         <ProductoAutocomplete
           productos={productos}
           onSeleccionar={(p) => {
@@ -388,6 +465,95 @@ export default function VendedorPage() {
             setOrigenDeposito(false);
           }}
         />
+
+        {agregandoProducto && (
+          <div className="border rounded-lg p-3 bg-card flex flex-col gap-2">
+            <label className="text-sm font-medium">Producto nuevo</label>
+            <div className="flex gap-2">
+              <Input
+                value={nombreProductoNuevo}
+                onChange={(e) => setNombreProductoNuevo(e.target.value)}
+                placeholder="Nombre (ej. Banana)"
+                autoFocus
+                className="flex-1"
+              />
+              <Input
+                value={variedadProductoNuevo}
+                onChange={(e) => setVariedadProductoNuevo(e.target.value)}
+                placeholder="Variedad (opcional)"
+                className="flex-1"
+              />
+            </div>
+            <div className="flex gap-2 items-end">
+              <div className="flex-1">
+                <label className="text-xs">Tipo de stock</label>
+                <Select
+                  value={tipoStockProductoNuevo}
+                  onValueChange={(v) =>
+                    setTipoStockProductoNuevo((v ?? "libre") as "libre" | "controlado")
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      {(value: string | null) =>
+                        value === "controlado" ? "Con stock (depósito)" : "Sin stock"
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="libre">Sin stock</SelectItem>
+                    <SelectItem value="controlado">Con stock (depósito)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-28">
+                <label className="text-xs">Precio</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={precioProductoNuevo}
+                  onChange={(e) => setPrecioProductoNuevo(e.target.value)}
+                />
+              </div>
+              {tipoStockProductoNuevo === "controlado" && (
+                <div className="w-32">
+                  <label className="text-xs">Stock inicial</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Opcional"
+                    value={stockInicialProductoNuevo}
+                    onChange={(e) => setStockInicialProductoNuevo(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={agregarProductoRapido}
+                disabled={guardandoProducto || !nombreProductoNuevo.trim() || !precioProductoNuevo}
+              >
+                Agregar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAgregandoProducto(false);
+                  setNombreProductoNuevo("");
+                  setVariedadProductoNuevo("");
+                  setTipoStockProductoNuevo("libre");
+                  setPrecioProductoNuevo("");
+                  setStockInicialProductoNuevo("");
+                  setErrorProductoNuevo(null);
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+            {errorProductoNuevo && <p className="text-sm text-red-600">{errorProductoNuevo}</p>}
+          </div>
+        )}
+
         {productoSeleccionado && (
           <div className="flex flex-col gap-2">
             <div className="flex items-end gap-2">
