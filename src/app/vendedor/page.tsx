@@ -581,6 +581,7 @@ export default function VendedorPage() {
                   min="0"
                   value={precio}
                   onChange={(e) => setPrecio(e.target.value)}
+                  onFocus={(e) => e.target.select()}
                   className="w-28"
                 />
               </div>
