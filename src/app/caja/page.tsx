@@ -58,7 +58,7 @@ type CobroSinConciliar = Awaited<ReturnType<typeof listarCobrosSinConciliar>>[nu
 
 const estadoPedidoLabel: Record<string, { texto: string; variant: "default" | "secondary" | "destructive" }> = {
   creado: { texto: "Pendiente de cobro", variant: "secondary" },
-  cobrado: { texto: "Cobrado", variant: "default" },
+  cobrado: { texto: "A retirar", variant: "default" },
   retirado: { texto: "Retirado", variant: "secondary" },
   cancelado: { texto: "Cancelado", variant: "destructive" },
 };

@@ -697,7 +697,7 @@ export default function VendedorPage() {
                       </Badge>
                     ) : (
                       <div className="flex items-center gap-2">
-                        <Badge>Puede retirar</Badge>
+                        <Badge>A retirar</Badge>
                         <Button
                           size="sm"
                           variant="outline"
