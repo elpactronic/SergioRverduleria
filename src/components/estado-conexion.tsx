@@ -22,12 +22,15 @@ export function EstadoConexion() {
     return () => clearInterval(interval);
   }, [online]);
 
+  const estado = !online
+    ? { texto: "Sin conexión", clase: "bg-red-600 text-white" }
+    : pendientes > 0
+      ? { texto: `${pendientes} por sincronizar`, clase: "bg-yellow-500 text-black" }
+      : { texto: "En línea", clase: "bg-green-600 text-white" };
+
   return (
     <div className="flex items-center gap-2">
-      <Badge variant={online ? "default" : "destructive"}>
-        {online ? "En línea" : "Sin conexión"}
-      </Badge>
-      {pendientes > 0 && <Badge variant="secondary">{pendientes} por sincronizar</Badge>}
+      <Badge className={estado.clase}>{estado.texto}</Badge>
     </div>
   );
 }
