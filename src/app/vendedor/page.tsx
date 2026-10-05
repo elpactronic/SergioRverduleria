@@ -97,7 +97,7 @@ export default function VendedorPage() {
 
   useWakeLock();
   const { online } = useSync();
-  const { nombre: miNombre } = useMiPerfil();
+  const { nombre: miNombre, rol: miRol } = useMiPerfil();
 
   const pagadosAnterioresRef = useRef<Map<string, string> | null>(null);
 
@@ -382,9 +382,11 @@ export default function VendedorPage() {
         <EstadoConexion />
       </div>
 
-      <Link href="/caja" className="text-sm underline text-neutral-500 self-start">
-        Registrar un cobro
-      </Link>
+      {miRol !== "vendedor" && (
+        <Link href="/caja" className="text-sm underline text-neutral-500 self-start">
+          Registrar un cobro
+        </Link>
+      )}
 
       <div>
         <div className="flex items-center justify-between mb-1">
