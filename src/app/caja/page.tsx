@@ -2,23 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { db, type CobroLocal } from "@/lib/offline/db";
-import { sincronizarTodo } from "@/lib/offline/sync";
+import { db, type CobroLocal, type ProductoCache } from "@/lib/offline/db";
+import { sincronizarTodo, actualizarCatalogosLocales } from "@/lib/offline/sync";
 import { getDispositivoId, getUsuario } from "@/lib/session";
 import {
   listarPedidosRecientes,
   obtenerDetallePedido,
   cancelarPedido,
   marcarRetirado,
+  agregarItemPedido,
+  quitarItemPedido,
 } from "@/lib/actions/pedidos";
 import { listarCobrosSinConciliar, cancelarCobro } from "@/lib/actions/cobros";
 import { sonarPedidoNuevo, sonarCobrado, sonarRetirado } from "@/lib/sonidos";
 import { useWakeLock } from "@/lib/use-wake-lock";
+import { ProductoAutocomplete } from "@/components/producto-autocomplete";
 import { EstadoConexion } from "@/components/estado-conexion";
 import { BotonVolver } from "@/components/boton-volver";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -76,6 +80,14 @@ export default function CajaPage() {
   const [montoDialogo, setMontoDialogo] = useState("");
   const [cargandoDetalle, setCargandoDetalle] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+
+  const [productos, setProductos] = useState<ProductoCache[]>([]);
+  const [productoNuevoDialogo, setProductoNuevoDialogo] = useState<ProductoCache | null>(null);
+  const [cantidadNuevoDialogo, setCantidadNuevoDialogo] = useState("1");
+  const [precioNuevoDialogo, setPrecioNuevoDialogo] = useState("");
+  const [origenDepositoDialogo, setOrigenDepositoDialogo] = useState(false);
+  const [modificandoPedido, setModificandoPedido] = useState(false);
+  const [errorModificarPedido, setErrorModificarPedido] = useState<string | null>(null);
 
   const [cobrosSinConciliar, setCobrosSinConciliar] = useState<CobroSinConciliar[]>([]);
   const [cancelandoId, setCancelandoId] = useState<string | null>(null);
@@ -178,6 +190,19 @@ export default function CajaPage() {
 
   useEffect(() => {
     (async () => {
+      if (navigator.onLine) {
+        try {
+          await actualizarCatalogosLocales();
+        } catch {
+          // Sin conexión real pese al indicador: seguimos con lo que haya en caché.
+        }
+      }
+      setProductos(await db.productosCache.toArray());
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
       await refrescarCobros();
       await refrescarPedidos();
       await refrescarSinConciliar();
@@ -248,10 +273,70 @@ export default function CajaPage() {
     setMontoDialogo(p.total);
     setDetallePedido(null);
     setCargandoDetalle(true);
+    setProductoNuevoDialogo(null);
+    setCantidadNuevoDialogo("1");
+    setPrecioNuevoDialogo("");
+    setOrigenDepositoDialogo(false);
+    setErrorModificarPedido(null);
     try {
       setDetallePedido(await obtenerDetallePedido(p.id));
     } finally {
       setCargandoDetalle(false);
+    }
+  }
+
+  async function agregarItemAlPedidoDialogo() {
+    if (!pedidoACobrar || !productoNuevoDialogo || !cantidadNuevoDialogo || !precioNuevoDialogo) return;
+    setErrorModificarPedido(null);
+    setModificandoPedido(true);
+    try {
+      await agregarItemPedido({
+        pedidoId: pedidoACobrar.id,
+        productoId: productoNuevoDialogo.id,
+        detalle: `${productoNuevoDialogo.nombre}${
+          productoNuevoDialogo.variedad ? " " + productoNuevoDialogo.variedad : ""
+        }`,
+        cantidadBultos: cantidadNuevoDialogo,
+        precioUnitario: precioNuevoDialogo,
+        origen:
+          productoNuevoDialogo.tipoStock === "controlado" && origenDepositoDialogo
+            ? "deposito"
+            : "mostrador",
+        usuario: getUsuario() || "C1",
+        dispositivo: getDispositivoId(),
+      });
+      const actualizado = await obtenerDetallePedido(pedidoACobrar.id);
+      setDetallePedido(actualizado);
+      if (actualizado) setMontoDialogo(actualizado.total);
+      setProductoNuevoDialogo(null);
+      setCantidadNuevoDialogo("1");
+      setPrecioNuevoDialogo("");
+      setOrigenDepositoDialogo(false);
+    } catch (err) {
+      setErrorModificarPedido(err instanceof Error ? err.message : "No se pudo agregar el producto.");
+    } finally {
+      setModificandoPedido(false);
+    }
+  }
+
+  async function quitarItemDelPedidoDialogo(itemId: string) {
+    if (!pedidoACobrar) return;
+    setErrorModificarPedido(null);
+    setModificandoPedido(true);
+    try {
+      await quitarItemPedido({
+        pedidoId: pedidoACobrar.id,
+        itemId,
+        usuario: getUsuario() || "C1",
+        dispositivo: getDispositivoId(),
+      });
+      const actualizado = await obtenerDetallePedido(pedidoACobrar.id);
+      setDetallePedido(actualizado);
+      if (actualizado) setMontoDialogo(actualizado.total);
+    } catch (err) {
+      setErrorModificarPedido(err instanceof Error ? err.message : "No se pudo quitar el producto.");
+    } finally {
+      setModificandoPedido(false);
     }
   }
 
@@ -444,6 +529,7 @@ export default function CajaPage() {
                     <TableHead>Cant</TableHead>
                     <TableHead>Detalle</TableHead>
                     <TableHead className="text-right">Total</TableHead>
+                    <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -452,10 +538,87 @@ export default function CajaPage() {
                       <TableCell>{item.cantidadBultos}</TableCell>
                       <TableCell>{item.detalle}</TableCell>
                       <TableCell className="text-right">${item.total}</TableCell>
+                      <TableCell>
+                        {detallePedido.items.length > 1 && (
+                          <button
+                            type="button"
+                            className="text-xs text-neutral-400 hover:text-neutral-700 underline"
+                            disabled={modificandoPedido}
+                            onClick={() => quitarItemDelPedidoDialogo(item.id)}
+                          >
+                            Quitar
+                          </button>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+
+              <div className="border rounded-lg p-3 bg-card flex flex-col gap-2">
+                <label className="text-sm font-medium">
+                  ¿Se acordó de algo más? Agregar producto
+                </label>
+                <ProductoAutocomplete
+                  productos={productos}
+                  onSeleccionar={(p) => {
+                    setProductoNuevoDialogo(p);
+                    setPrecioNuevoDialogo(p.precioUnitario);
+                    setOrigenDepositoDialogo(false);
+                  }}
+                />
+                {productoNuevoDialogo && (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <span className="text-xs text-neutral-500">
+                          {productoNuevoDialogo.nombre}
+                          {productoNuevoDialogo.variedad ? ` — ${productoNuevoDialogo.variedad}` : ""}
+                        </span>
+                      </div>
+                      <div>
+                        <label className="text-xs">Cant.</label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={cantidadNuevoDialogo}
+                          onChange={(e) => setCantidadNuevoDialogo(e.target.value)}
+                          className="w-20"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs">Precio</label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={precioNuevoDialogo}
+                          onChange={(e) => setPrecioNuevoDialogo(e.target.value)}
+                          onFocus={(e) => e.target.select()}
+                          className="w-24"
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={agregarItemAlPedidoDialogo}
+                        disabled={modificandoPedido || !cantidadNuevoDialogo || !precioNuevoDialogo}
+                      >
+                        Agregar
+                      </Button>
+                    </div>
+                    {productoNuevoDialogo.tipoStock === "controlado" && (
+                      <label className="flex items-center gap-2 text-xs text-neutral-600">
+                        <Switch checked={origenDepositoDialogo} onCheckedChange={setOrigenDepositoDialogo} />
+                        Esta vez sale de depósito (descuenta stock)
+                      </label>
+                    )}
+                  </div>
+                )}
+                {errorModificarPedido && (
+                  <p className="text-sm text-red-600">{errorModificarPedido}</p>
+                )}
+              </div>
+
               <div>
                 <label className="text-sm font-medium mb-1 block">Monto a cobrar</label>
                 <Input

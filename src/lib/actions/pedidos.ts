@@ -159,6 +159,117 @@ export async function obtenerDetallePedido(pedidoId: string) {
   };
 }
 
+async function recalcularTotalPedido(pedidoId: string): Promise<string> {
+  const db = getDb();
+  const items = await db.query.pedidoItems.findMany({ where: eq(pedidoItems.pedidoId, pedidoId) });
+  const total = items.reduce((acc, i) => acc + Number(i.total), 0).toFixed(2);
+  await db.update(pedidos).set({ total }).where(eq(pedidos.id, pedidoId));
+  return total;
+}
+
+/**
+ * Agrega un ítem a un pedido que todavía no fue cobrado — pensado para el
+ * momento del cobro en caja, cuando el cliente se acuerda de algo más que
+ * quiere llevar. Solo funciona mientras el pedido sigue "creado": una vez
+ * cobrado, cambiar lo que se pagó requiere cancelar y rehacer, no editar en
+ * caliente.
+ */
+export async function agregarItemPedido(params: {
+  pedidoId: string;
+  productoId: string;
+  detalle: string;
+  cantidadBultos: string;
+  precioUnitario: string;
+  origen: "mostrador" | "deposito";
+  usuario: string;
+  dispositivo?: string;
+}) {
+  const db = getDb();
+
+  const pedido = await db.query.pedidos.findFirst({ where: eq(pedidos.id, params.pedidoId) });
+  if (!pedido) throw new Error("El pedido no existe.");
+  if (pedido.estado !== "creado") {
+    throw new Error("Este pedido ya fue cobrado — no se puede modificar, hay que cancelarlo y rehacerlo.");
+  }
+
+  const total = (Number(params.cantidadBultos) * Number(params.precioUnitario)).toFixed(2);
+
+  const [item] = await db
+    .insert(pedidoItems)
+    .values({
+      pedidoId: params.pedidoId,
+      productoId: params.productoId,
+      detalle: params.detalle,
+      cantidadBultos: params.cantidadBultos,
+      precioUnitario: params.precioUnitario,
+      total,
+      origen: params.origen,
+    })
+    .returning();
+
+  const nuevoTotal = await recalcularTotalPedido(params.pedidoId);
+
+  await registrarAuditoria({
+    operationId: crypto.randomUUID(),
+    usuario: params.usuario,
+    dispositivo: params.dispositivo,
+    accion: "AGREGAR_ITEM_PEDIDO",
+    entidad: "pedido",
+    entidadId: params.pedidoId,
+    numeroPedido: pedido.numeroPedido,
+    infoAdicional: { item },
+  });
+
+  return { item, total: nuevoTotal };
+}
+
+/**
+ * Quita un ítem de un pedido que todavía no fue cobrado (el cliente se
+ * arrepintió de algo antes de pagar). Igual que agregarItemPedido, solo
+ * funciona mientras el pedido sigue "creado".
+ */
+export async function quitarItemPedido(params: {
+  pedidoId: string;
+  itemId: string;
+  usuario: string;
+  dispositivo?: string;
+}) {
+  const db = getDb();
+
+  const pedido = await db.query.pedidos.findFirst({ where: eq(pedidos.id, params.pedidoId) });
+  if (!pedido) throw new Error("El pedido no existe.");
+  if (pedido.estado !== "creado") {
+    throw new Error("Este pedido ya fue cobrado — no se puede modificar, hay que cancelarlo y rehacerlo.");
+  }
+
+  const itemsActuales = await db.query.pedidoItems.findMany({
+    where: eq(pedidoItems.pedidoId, params.pedidoId),
+  });
+  if (itemsActuales.length <= 1) {
+    throw new Error("El pedido tiene que tener al menos un producto.");
+  }
+
+  const [quitado] = await db
+    .delete(pedidoItems)
+    .where(eq(pedidoItems.id, params.itemId))
+    .returning();
+
+  const nuevoTotal = await recalcularTotalPedido(params.pedidoId);
+
+  await registrarAuditoria({
+    operationId: crypto.randomUUID(),
+    usuario: params.usuario,
+    dispositivo: params.dispositivo,
+    accion: "QUITAR_ITEM_PEDIDO",
+    entidad: "pedido",
+    entidadId: params.pedidoId,
+    numeroPedido: pedido.numeroPedido,
+    infoAdicional: { item: quitado },
+  });
+
+  return { total: nuevoTotal };
+}
+
 /**
  * Sincroniza un pedido creado offline. Idempotente por UUID: si ya existe
  * (reintento de sync) no lo duplica. Si el producto es de stock controlado,

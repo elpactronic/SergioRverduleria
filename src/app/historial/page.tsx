@@ -12,6 +12,8 @@ type EventoAudit = Awaited<ReturnType<typeof buscarHistorial>>[number];
 
 const ACCION_LABEL: Record<string, string> = {
   CREAR_PEDIDO: "Pedido creado",
+  AGREGAR_ITEM_PEDIDO: "Se agregó un producto al pedido",
+  QUITAR_ITEM_PEDIDO: "Se quitó un producto del pedido",
   REGISTRAR_COBRO: "Cobro registrado",
   AUTORIZAR_RETIRO: "Cobro conciliado — autoriza el retiro",
   RETIRAR_PEDIDO: "Mercadería retirada",
@@ -21,6 +23,8 @@ const ACCION_LABEL: Record<string, string> = {
 
 const ACCION_VARIANT: Record<string, "default" | "secondary" | "destructive"> = {
   CREAR_PEDIDO: "secondary",
+  AGREGAR_ITEM_PEDIDO: "secondary",
+  QUITAR_ITEM_PEDIDO: "secondary",
   REGISTRAR_COBRO: "secondary",
   AUTORIZAR_RETIRO: "default",
   RETIRAR_PEDIDO: "default",
