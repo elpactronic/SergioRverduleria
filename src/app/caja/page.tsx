@@ -390,9 +390,14 @@ export default function CajaPage() {
         <EstadoConexion />
       </div>
 
-      <Link href="/cierre-caja" className="text-sm underline text-neutral-500 self-start">
-        Ver cierre de caja
-      </Link>
+      <div className="flex gap-4">
+        <Link href="/cierre-caja" className="text-sm underline text-neutral-500 self-start">
+          Ver cierre de caja
+        </Link>
+        <Link href="/vendedor" className="text-sm underline text-neutral-500 self-start">
+          Tomar un pedido
+        </Link>
+      </div>
 
       <div className="border rounded-lg p-4 bg-card flex flex-col gap-3">
         <div className="flex gap-3">
