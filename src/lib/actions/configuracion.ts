@@ -5,6 +5,7 @@ import { and, eq, gte } from "drizzle-orm";
 import { getDb } from "@/db";
 import { configuracionApp, auditLog } from "@/db/schema";
 import { registrarAuditoria } from "./audit";
+import { obtenerMiPerfil } from "./usuarios";
 
 const SINGLETON_ID = "singleton";
 
@@ -67,6 +68,30 @@ export async function verificarPinConLimite(params: {
   }
 }
 
+async function guardarHashPin(pinNuevo: string, usuario: string) {
+  const db = getDb();
+  const hash = await bcrypt.hash(pinNuevo, 10);
+  const existente = await obtenerFila();
+
+  if (existente) {
+    await db
+      .update(configuracionApp)
+      .set({
+        pinCancelacionHash: hash,
+        actualizadoEn: new Date(),
+        actualizadoPor: usuario,
+      })
+      .where(eq(configuracionApp.id, SINGLETON_ID));
+  } else {
+    await db.insert(configuracionApp).values({
+      id: SINGLETON_ID,
+      pinCancelacionHash: hash,
+      actualizadoEn: new Date(),
+      actualizadoPor: usuario,
+    });
+  }
+}
+
 /** Cambia el PIN de cancelación. Requiere conocer el PIN actual (protegido por el mismo límite de intentos). */
 export async function cambiarPin(params: {
   pinActual: string;
@@ -84,33 +109,44 @@ export async function cambiarPin(params: {
     dispositivo: params.dispositivo,
   });
 
-  const db = getDb();
-  const hash = await bcrypt.hash(params.pinNuevo, 10);
-  const existente = await obtenerFila();
-
-  if (existente) {
-    await db
-      .update(configuracionApp)
-      .set({
-        pinCancelacionHash: hash,
-        actualizadoEn: new Date(),
-        actualizadoPor: params.usuario,
-      })
-      .where(eq(configuracionApp.id, SINGLETON_ID));
-  } else {
-    await db.insert(configuracionApp).values({
-      id: SINGLETON_ID,
-      pinCancelacionHash: hash,
-      actualizadoEn: new Date(),
-      actualizadoPor: params.usuario,
-    });
-  }
+  await guardarHashPin(params.pinNuevo, params.usuario);
 
   await registrarAuditoria({
     operationId: crypto.randomUUID(),
     usuario: params.usuario,
     dispositivo: params.dispositivo,
     accion: "CAMBIAR_PIN_CANCELACION",
+    entidad: "configuracion",
+  });
+}
+
+/**
+ * Resetea el PIN sin necesidad de saber el actual — solo para cuando se
+ * perdió. Verificado server-side que quien llama es realmente Administrador
+ * (no alcanza con que la pantalla de Configuración ya esté restringida a
+ * admin por proxy.ts, esto es una segunda confirmación).
+ */
+export async function resetearPin(params: {
+  pinNuevo: string;
+  usuario: string;
+  dispositivo?: string;
+}) {
+  if (!/^\d{6}$/.test(params.pinNuevo)) {
+    throw new Error("El PIN nuevo debe tener exactamente 6 dígitos numéricos.");
+  }
+
+  const perfil = await obtenerMiPerfil();
+  if (!perfil || perfil.rol !== "admin") {
+    throw new Error("Solo el administrador puede resetear el PIN sin el anterior.");
+  }
+
+  await guardarHashPin(params.pinNuevo, params.usuario);
+
+  await registrarAuditoria({
+    operationId: crypto.randomUUID(),
+    usuario: params.usuario,
+    dispositivo: params.dispositivo,
+    accion: "RESETEAR_PIN_CANCELACION",
     entidad: "configuracion",
   });
 }

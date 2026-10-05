@@ -18,6 +18,7 @@ import {
 } from "@/lib/tema";
 import {
   cambiarPin,
+  resetearPin,
   obtenerDiasRetencionHistorial,
   guardarDiasRetencionHistorial,
 } from "@/lib/actions/configuracion";
@@ -222,6 +223,43 @@ export default function ConfiguracionPage() {
     }
   }
 
+  const [mostrarReseteo, setMostrarReseteo] = useState(false);
+  const [pinReseteoNuevo, setPinReseteoNuevo] = useState("");
+  const [pinReseteoConfirmar, setPinReseteoConfirmar] = useState("");
+  const [reseteandoPin, setReseteandoPin] = useState(false);
+  const [errorReseteo, setErrorReseteo] = useState<string | null>(null);
+  const [exitoReseteo, setExitoReseteo] = useState(false);
+
+  async function resetearPinSinActual() {
+    setErrorReseteo(null);
+    setExitoReseteo(false);
+
+    if (!/^\d{6}$/.test(pinReseteoNuevo)) {
+      setErrorReseteo("El PIN nuevo debe tener exactamente 6 dígitos.");
+      return;
+    }
+    if (pinReseteoNuevo !== pinReseteoConfirmar) {
+      setErrorReseteo("El PIN nuevo y su confirmación no coinciden.");
+      return;
+    }
+
+    setReseteandoPin(true);
+    try {
+      await resetearPin({
+        pinNuevo: pinReseteoNuevo,
+        usuario: getUsuario() || "admin",
+        dispositivo: getDispositivoId(),
+      });
+      setExitoReseteo(true);
+      setPinReseteoNuevo("");
+      setPinReseteoConfirmar("");
+    } catch (err) {
+      setErrorReseteo(err instanceof Error ? err.message : "No se pudo resetear el PIN.");
+    } finally {
+      setReseteandoPin(false);
+    }
+  }
+
   return (
     <main className="flex-1 flex flex-col gap-6 p-4 max-w-2xl mx-auto w-full">
       <div className="flex items-center gap-2">
@@ -354,6 +392,55 @@ export default function ConfiguracionPage() {
           >
             Cambiar PIN
           </Button>
+
+          <button
+            type="button"
+            className="text-xs underline text-neutral-500 self-start"
+            onClick={() => setMostrarReseteo((v) => !v)}
+          >
+            {mostrarReseteo ? "Ocultar" : "¿Olvidaste el PIN actual?"}
+          </button>
+
+          {mostrarReseteo && (
+            <div className="border rounded-lg p-3 bg-card flex flex-col gap-2">
+              <p className="text-xs text-muted-foreground">
+                Solo el Administrador puede resetear el PIN sin saber el anterior — útil si nadie
+                se acuerda cuál es.
+              </p>
+              <div>
+                <label className="text-sm font-medium mb-1 block">PIN nuevo (6 dígitos)</label>
+                <Input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={pinReseteoNuevo}
+                  onChange={(e) => setPinReseteoNuevo(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Confirmar PIN nuevo</label>
+                <Input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={pinReseteoConfirmar}
+                  onChange={(e) => setPinReseteoConfirmar(e.target.value)}
+                />
+              </div>
+
+              {errorReseteo && <p className="text-sm text-red-600">{errorReseteo}</p>}
+              {exitoReseteo && <p className="text-sm text-green-600">PIN reseteado correctamente.</p>}
+
+              <Button
+                variant="outline"
+                onClick={resetearPinSinActual}
+                disabled={reseteandoPin || !pinReseteoNuevo || !pinReseteoConfirmar}
+                className="self-start"
+              >
+                Resetear PIN
+              </Button>
+            </div>
+          )}
         </div>
       </section>
 
