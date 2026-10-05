@@ -1,6 +1,6 @@
 "use server";
 
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, like } from "drizzle-orm";
 import { getDb } from "@/db";
 import { productos, type tipoStockEnum } from "@/db/schema";
 import { siguienteCodigo } from "@/lib/ids";
@@ -25,9 +25,12 @@ export async function crearProducto(params: {
   dispositivo?: string;
 }) {
   const db = getDb();
+  // Filtrado por prefijo "P-": códigos de otro origen (ej. datos de demo con
+  // otro prefijo) no deben confundir el cálculo del próximo número.
   const [ultimo] = await db
     .select({ codigo: productos.codigo })
     .from(productos)
+    .where(like(productos.codigo, "P-%"))
     .orderBy(desc(productos.codigo))
     .limit(1);
 

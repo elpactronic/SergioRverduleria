@@ -1,6 +1,6 @@
 "use server";
 
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, like } from "drizzle-orm";
 import { getDb } from "@/db";
 import { clientes } from "@/db/schema";
 import { siguienteCodigo } from "@/lib/ids";
@@ -20,9 +20,12 @@ export async function crearCliente(params: {
   dispositivo?: string;
 }) {
   const db = getDb();
+  // Filtrado por prefijo "C-": códigos de otro origen (ej. datos de demo con
+  // otro prefijo) no deben confundir el cálculo del próximo número.
   const [ultimo] = await db
     .select({ codigo: clientes.codigo })
     .from(clientes)
+    .where(like(clientes.codigo, "C-%"))
     .orderBy(desc(clientes.codigo))
     .limit(1);
 
