@@ -12,6 +12,7 @@ import { crearProducto } from "@/lib/actions/productos";
 import { guardarApertura } from "@/lib/actions/deposito";
 import { sonarCobrado, sonarRetirado } from "@/lib/sonidos";
 import { useWakeLock } from "@/lib/use-wake-lock";
+import { useMiPerfil } from "@/lib/use-mi-perfil";
 import { useSync } from "@/lib/offline/use-sync";
 import { ProductoAutocomplete } from "@/components/producto-autocomplete";
 import { TicketConAcciones } from "@/components/ticket-actions";
@@ -96,6 +97,7 @@ export default function VendedorPage() {
 
   useWakeLock();
   const { online } = useSync();
+  const { nombre: miNombre } = useMiPerfil();
 
   const pagadosAnterioresRef = useRef<Map<string, string> | null>(null);
 
@@ -170,7 +172,7 @@ export default function VendedorPage() {
     try {
       await marcarRetirado({
         pedidoId: p.id,
-        usuario: getUsuario() || "V1",
+        usuario: miNombre || getUsuario() || "V1",
         dispositivo: getDispositivoId(),
       });
       await refrescarPagados();
@@ -187,7 +189,7 @@ export default function VendedorPage() {
     try {
       const nuevo = await crearCliente({
         nombre,
-        usuario: getUsuario() || "V1",
+        usuario: miNombre || getUsuario() || "V1",
         dispositivo: getDispositivoId(),
       });
       const nuevoCache = {
@@ -217,7 +219,7 @@ export default function VendedorPage() {
     setErrorProductoNuevo(null);
     setGuardandoProducto(true);
     try {
-      const usuario = getUsuario() || "V1";
+      const usuario = miNombre || getUsuario() || "V1";
       const dispositivo = getDispositivoId();
       const nuevo = await crearProducto({
         nombre,
@@ -328,7 +330,7 @@ export default function VendedorPage() {
         fecha,
         clienteId: cliente?.id ?? null,
         clienteNombre: cliente?.nombre ?? "Consumidor final",
-        vendedorId: getUsuario() || "V1",
+        vendedorId: miNombre || getUsuario() || "V1",
         dispositivoId: getDispositivoId(),
         items,
         total: totalPedido,

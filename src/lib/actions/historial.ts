@@ -8,6 +8,7 @@ import { obtenerDiasRetencionHistorial } from "./configuracion";
 export interface BuscarHistorialParams {
   numeroPedido?: number;
   fecha?: string;
+  usuario?: string;
 }
 
 /** Trae los eventos de auditoría de pedidos (creación, cobro, retiro, cancelación), para reconstruir qué pasó ante un reclamo. */
@@ -20,6 +21,9 @@ export async function buscarHistorial(params: BuscarHistorialParams) {
   }
   if (params.fecha) {
     condiciones.push(sql`${auditLog.timestamp}::date = ${params.fecha}::date`);
+  }
+  if (params.usuario) {
+    condiciones.push(eq(auditLog.usuario, params.usuario));
   }
 
   const filas = await db.query.auditLog.findMany({
@@ -35,13 +39,18 @@ export async function buscarHistorial(params: BuscarHistorialParams) {
  * la ventana de retención configurada (o de los últimos `diasPorDefecto` días
  * si todavía no se configuró nada), sin necesidad de elegir una fecha puntual.
  */
-export async function listarActividadReciente(diasPorDefecto = 1) {
+export async function listarActividadReciente(diasPorDefecto = 1, usuario?: string) {
   const db = getDb();
   const dias = (await obtenerDiasRetencionHistorial()) ?? diasPorDefecto;
   const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
 
+  const condiciones = [isNotNull(auditLog.numeroPedido), sql`${auditLog.timestamp} >= ${desde}`];
+  if (usuario) {
+    condiciones.push(eq(auditLog.usuario, usuario));
+  }
+
   const filas = await db.query.auditLog.findMany({
-    where: and(isNotNull(auditLog.numeroPedido), sql`${auditLog.timestamp} >= ${desde}`),
+    where: and(...condiciones),
     orderBy: (a, { asc }) => [asc(a.timestamp)],
   });
 

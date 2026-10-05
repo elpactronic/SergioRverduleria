@@ -21,7 +21,29 @@ import {
   obtenerDiasRetencionHistorial,
   guardarDiasRetencionHistorial,
 } from "@/lib/actions/configuracion";
+import {
+  listarUsuariosPermitidos,
+  agregarUsuarioPermitido,
+  cambiarRolUsuario,
+  quitarUsuarioPermitido,
+} from "@/lib/actions/usuarios";
+import { ROL_LABEL, type Rol } from "@/lib/roles";
 import { getUsuario, getDispositivoId } from "@/lib/session";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 const MODOS: { id: Modo; nombre: string }[] = [
   { id: "claro", nombre: "Claro" },
@@ -71,6 +93,77 @@ export default function ConfiguracionPage() {
   const [guardandoRetencion, setGuardandoRetencion] = useState(false);
   const [errorRetencion, setErrorRetencion] = useState<string | null>(null);
   const [exitoRetencion, setExitoRetencion] = useState(false);
+
+  type UsuarioPermitido = Awaited<ReturnType<typeof listarUsuariosPermitidos>>[number];
+  const [usuarios, setUsuarios] = useState<UsuarioPermitido[]>([]);
+  const [nuevoEmail, setNuevoEmail] = useState("");
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoRol, setNuevoRol] = useState<Rol>("vendedor");
+  const [agregandoUsuario, setAgregandoUsuario] = useState(false);
+  const [errorUsuario, setErrorUsuario] = useState<string | null>(null);
+  const [procesandoId, setProcesandoId] = useState<string | null>(null);
+
+  async function cargarUsuarios() {
+    setUsuarios(await listarUsuariosPermitidos());
+  }
+
+  useEffect(() => {
+    (async () => {
+      await cargarUsuarios();
+    })();
+  }, []);
+
+  async function agregarUsuario() {
+    setErrorUsuario(null);
+    setAgregandoUsuario(true);
+    try {
+      await agregarUsuarioPermitido({
+        email: nuevoEmail,
+        nombre: nuevoNombre,
+        rol: nuevoRol,
+        usuario: getUsuario() || "admin",
+        dispositivo: getDispositivoId(),
+      });
+      setNuevoEmail("");
+      setNuevoNombre("");
+      setNuevoRol("vendedor");
+      await cargarUsuarios();
+    } catch (err) {
+      setErrorUsuario(err instanceof Error ? err.message : "No se pudo agregar.");
+    } finally {
+      setAgregandoUsuario(false);
+    }
+  }
+
+  async function cambiarRol(id: string, rol: Rol) {
+    setProcesandoId(id);
+    try {
+      await cambiarRolUsuario({
+        id,
+        rol,
+        usuario: getUsuario() || "admin",
+        dispositivo: getDispositivoId(),
+      });
+      await cargarUsuarios();
+    } finally {
+      setProcesandoId(null);
+    }
+  }
+
+  async function quitarUsuario(id: string, email: string) {
+    if (!window.confirm(`¿Sacar a "${email}" del sistema? Pierde el acceso al instante.`)) return;
+    setProcesandoId(id);
+    try {
+      await quitarUsuarioPermitido({
+        id,
+        usuario: getUsuario() || "admin",
+        dispositivo: getDispositivoId(),
+      });
+      await cargarUsuarios();
+    } finally {
+      setProcesandoId(null);
+    }
+  }
 
   async function guardarRetencion() {
     setErrorRetencion(null);
@@ -294,6 +387,102 @@ export default function ConfiguracionPage() {
           <Button onClick={guardarRetencion} disabled={guardandoRetencion} className="self-start">
             Guardar
           </Button>
+        </div>
+      </section>
+
+      <section className="border rounded-lg p-4 bg-card flex flex-col gap-3">
+        <div>
+          <h2 className="font-semibold">Personas y permisos</h2>
+          <p className="text-xs text-muted-foreground">
+            Quién puede entrar al sistema y qué pantallas ve. El Cajero también puede cargar
+            pedidos; el Vendedor solo puede cargar pedidos, no cobrar.
+          </p>
+        </div>
+
+        {usuarios.length > 0 && (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Rol</TableHead>
+                <TableHead></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {usuarios.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell>{u.nombre}</TableCell>
+                  <TableCell className="text-xs">{u.email}</TableCell>
+                  <TableCell>
+                    <Select
+                      value={u.rol}
+                      onValueChange={(v) => v && cambiarRol(u.id, v as Rol)}
+                    >
+                      <SelectTrigger className="w-36" disabled={procesandoId === u.id}>
+                        <SelectValue>{(value: string | null) => ROL_LABEL[(value ?? "vendedor") as Rol]}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Administrador</SelectItem>
+                        <SelectItem value="cajero">Cajero</SelectItem>
+                        <SelectItem value="vendedor">Vendedor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="text-xs text-neutral-400 hover:text-neutral-700 underline"
+                      disabled={procesandoId === u.id}
+                      onClick={() => quitarUsuario(u.id, u.email)}
+                    >
+                      Quitar
+                    </button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+
+        <div className="flex flex-col gap-2 max-w-md">
+          <label className="text-sm font-medium">Agregar persona</label>
+          <div className="flex gap-2 flex-wrap">
+            <Input
+              value={nuevoNombre}
+              onChange={(e) => setNuevoNombre(e.target.value)}
+              placeholder="Nombre (ej. Miguel)"
+              className="flex-1 min-w-32"
+            />
+            <Input
+              value={nuevoEmail}
+              onChange={(e) => setNuevoEmail(e.target.value)}
+              placeholder="Email"
+              type="email"
+              className="flex-1 min-w-48"
+            />
+            <Select value={nuevoRol} onValueChange={(v) => v && setNuevoRol(v as Rol)}>
+              <SelectTrigger className="w-36">
+                <SelectValue>{(value: string | null) => ROL_LABEL[(value ?? "vendedor") as Rol]}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Administrador</SelectItem>
+                <SelectItem value="cajero">Cajero</SelectItem>
+                <SelectItem value="vendedor">Vendedor</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={agregarUsuario}
+              disabled={agregandoUsuario || !nuevoEmail.trim() || !nuevoNombre.trim()}
+            >
+              Agregar
+            </Button>
+          </div>
+          {errorUsuario && <p className="text-sm text-red-600">{errorUsuario}</p>}
+          <p className="text-xs text-muted-foreground">
+            La persona entra por primera vez con &quot;Sign up&quot; usando exactamente ese email —
+            después, con huella en su dispositivo.
+          </p>
         </div>
       </section>
 

@@ -16,6 +16,7 @@ import {
 import { listarCobrosSinConciliar, cancelarCobro } from "@/lib/actions/cobros";
 import { sonarPedidoNuevo, sonarCobrado, sonarRetirado } from "@/lib/sonidos";
 import { useWakeLock } from "@/lib/use-wake-lock";
+import { useMiPerfil } from "@/lib/use-mi-perfil";
 import { ProductoAutocomplete } from "@/components/producto-autocomplete";
 import { EstadoConexion } from "@/components/estado-conexion";
 import { BotonVolver } from "@/components/boton-volver";
@@ -104,6 +105,7 @@ export default function CajaPage() {
   const [retirandoId, setRetirandoId] = useState<string | null>(null);
 
   useWakeLock();
+  const { nombre: miNombre } = useMiPerfil();
 
   const pedidosAnterioresRef = useRef<Map<string, string> | null>(null);
 
@@ -171,7 +173,7 @@ export default function CajaPage() {
     try {
       await marcarRetirado({
         pedidoId: p.id,
-        usuario: getUsuario() || "C1",
+        usuario: miNombre || getUsuario() || "C1",
         dispositivo: getDispositivoId(),
       });
       await refrescarPedidos();
@@ -227,7 +229,7 @@ export default function CajaPage() {
     try {
       await cancelarCobro({
         cobroId: c.id,
-        usuario: getUsuario() || "C1",
+        usuario: miNombre || getUsuario() || "C1",
         dispositivo: getDispositivoId(),
       });
       await refrescarSinConciliar();
@@ -241,7 +243,7 @@ export default function CajaPage() {
       id: crypto.randomUUID(),
       pedidoNumero: numero,
       pedidoFecha: fechaPedido,
-      cajeroId: getUsuario() || "C1",
+      cajeroId: miNombre || getUsuario() || "C1",
       dispositivoId: getDispositivoId(),
       monto: montoStr,
       registradoEn: new Date().toISOString(),
@@ -302,7 +304,7 @@ export default function CajaPage() {
           productoNuevoDialogo.tipoStock === "controlado" && origenDepositoDialogo
             ? "deposito"
             : "mostrador",
-        usuario: getUsuario() || "C1",
+        usuario: miNombre || getUsuario() || "C1",
         dispositivo: getDispositivoId(),
       });
       const actualizado = await obtenerDetallePedido(pedidoACobrar.id);
@@ -327,7 +329,7 @@ export default function CajaPage() {
       await quitarItemPedido({
         pedidoId: pedidoACobrar.id,
         itemId,
-        usuario: getUsuario() || "C1",
+        usuario: miNombre || getUsuario() || "C1",
         dispositivo: getDispositivoId(),
       });
       const actualizado = await obtenerDetallePedido(pedidoACobrar.id);
@@ -368,7 +370,7 @@ export default function CajaPage() {
         pedidoId: pedidoACancelar.id,
         motivo: motivoCancelacion,
         pin: requierePin ? pinCancelacion : undefined,
-        usuario: getUsuario() || "C1",
+        usuario: miNombre || getUsuario() || "C1",
         dispositivo: getDispositivoId(),
       });
       setPedidoACancelar(null);

@@ -4,9 +4,17 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BotonVolver } from "@/components/boton-volver";
 import { buscarHistorial, listarActividadReciente, limpiarHistorialAntiguo } from "@/lib/actions/historial";
+import { listarUsuariosPermitidos } from "@/lib/actions/usuarios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type EventoAudit = Awaited<ReturnType<typeof buscarHistorial>>[number];
 
@@ -65,6 +73,8 @@ function agrupar(eventos: EventoAudit[]): GrupoPedido[] {
 export default function HistorialPage() {
   const [numeroPedido, setNumeroPedido] = useState("");
   const [fecha, setFecha] = useState("");
+  const [usuarioFiltro, setUsuarioFiltro] = useState("");
+  const [personas, setPersonas] = useState<{ nombre: string }[]>([]);
   const [eventos, setEventos] = useState<EventoAudit[] | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [diasVentana, setDiasVentana] = useState<number | null>(null);
@@ -75,6 +85,7 @@ export default function HistorialPage() {
       const filas = await buscarHistorial({
         numeroPedido: numeroPedido ? parseInt(numeroPedido, 10) : undefined,
         fecha: fecha || undefined,
+        usuario: usuarioFiltro || undefined,
       });
       setEventos(filas);
       setDiasVentana(null);
@@ -86,7 +97,7 @@ export default function HistorialPage() {
   async function cargarActividadReciente() {
     setBuscando(true);
     try {
-      const { filas, dias } = await listarActividadReciente();
+      const { filas, dias } = await listarActividadReciente(1, usuarioFiltro || undefined);
       setEventos(filas);
       setDiasVentana(dias);
     } finally {
@@ -96,9 +107,12 @@ export default function HistorialPage() {
 
   useEffect(() => {
     (async () => {
+      const permitidos = await listarUsuariosPermitidos();
+      setPersonas(permitidos.map((p) => ({ nombre: p.nombre })));
       await limpiarHistorialAntiguo().catch(() => {});
       await cargarActividadReciente();
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const grupos = eventos ? agrupar(eventos) : [];
@@ -123,6 +137,27 @@ export default function HistorialPage() {
         <div className="w-44">
           <label className="text-sm font-medium mb-1 block">Fecha</label>
           <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+        </div>
+        <div className="w-44">
+          <label className="text-sm font-medium mb-1 block">Persona</label>
+          <Select
+            value={usuarioFiltro || "__todas__"}
+            onValueChange={(v) => setUsuarioFiltro(v === "__todas__" ? "" : (v ?? ""))}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue>
+                {(value: string | null) => (!value || value === "__todas__" ? "Todas" : value)}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__todas__">Todas</SelectItem>
+              {personas.map((p) => (
+                <SelectItem key={p.nombre} value={p.nombre}>
+                  {p.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Button onClick={buscar} disabled={buscando}>
           Buscar

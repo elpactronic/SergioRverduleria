@@ -184,3 +184,20 @@ export const configuracionApp = pgTable("configuracion_app", {
   actualizadoEn: timestamp("actualizado_en", { withTimezone: true }),
   actualizadoPor: text("actualizado_por"),
 });
+
+export const rolUsuarioEnum = pgEnum("rol_usuario", ["admin", "vendedor", "cajero"]);
+
+/**
+ * Reemplaza la lista blanca de emails (antes una variable de entorno) y
+ * además define qué pantallas puede ver cada persona. Es la fuente de
+ * verdad que consulta src/proxy.ts en cada request para decidir si deja
+ * pasar y a dónde. Si un email no está acá, no entra — falla cerrado.
+ */
+export const usuariosPermitidos = pgTable("usuarios_permitidos", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  rol: rolUsuarioEnum("rol").notNull(),
+  nombre: text("nombre").notNull(),
+  creadoEn: timestamp("creado_en", { withTimezone: true }).notNull().defaultNow(),
+  actualizadoPor: text("actualizado_por"),
+});
